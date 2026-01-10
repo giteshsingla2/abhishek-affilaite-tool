@@ -16,9 +16,11 @@
     "framer-motion": "^12.25.0",
     "lucide-react": "^0.562.0",
     "papaparse": "^5.5.3",
+    "prismjs": "^1.30.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.12.0",
+    "react-simple-code-editor": "^0.14.1",
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {

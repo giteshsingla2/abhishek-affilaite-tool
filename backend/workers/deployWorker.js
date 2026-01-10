@@ -118,8 +118,11 @@ const worker = new Worker('deploy-queue', async (job) => {
       throw new Error(result.error || 'Upload failed for an unknown reason.');
     }
 
+    // 5. Update website document with final data
     website.status = 'Live';
     website.url = result.url;
+    website.htmlContent = htmlContent; // Save the final HTML content
+    website.headerCode = String(row.header_code || '').trim(); // Save the header code from CSV
     await website.save();
 
     console.log(`Job ${job.id} completed successfully. URL: ${result.url}`);

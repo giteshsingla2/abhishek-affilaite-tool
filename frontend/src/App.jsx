@@ -5,6 +5,7 @@ import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
 import Credentials from './pages/Credentials';
 import CreateCampaign from './pages/CreateCampaign';
+import Websites from './pages/Websites';
 import PrivateRoute from './routing/PrivateRoute';
 import Layout from './components/Layout';
 
@@ -18,6 +19,7 @@ function App() {
         <Route path="/dashboard" element={<PrivateRoute><Layout><Dashboard /></Layout></PrivateRoute>} />
         <Route path="/credentials" element={<PrivateRoute><Layout><Credentials /></Layout></PrivateRoute>} />
         <Route path="/create-campaign" element={<PrivateRoute><Layout><CreateCampaign /></Layout></PrivateRoute>} />
+        <Route path="/websites" element={<PrivateRoute><Layout><Websites /></Layout></PrivateRoute>} />
       </Routes>
     </Router>
   );

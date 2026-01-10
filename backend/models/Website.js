@@ -24,6 +24,14 @@ const WebsiteSchema = new mongoose.Schema({
     enum: ['Pending', 'Live', 'Failed'],
     default: 'Pending',
   },
+  htmlContent: {
+    type: String,
+    default: '',
+  },
+  headerCode: {
+    type: String,
+    default: '',
+  },
   createdAt: {
     type: Date,
     default: Date.now,

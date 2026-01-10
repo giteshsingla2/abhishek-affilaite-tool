@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { Globe, Rocket, Database, Zap, RefreshCw } from 'lucide-react';
+import { Globe, Rocket, Database, Zap, RefreshCw, LogOut } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import StatsCard from '../components/StatsCard';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -26,10 +27,17 @@ const StatusBadge = ({ status }) => {
 };
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const [stats, setStats] = useState({ totalWebsitesLive: 0, totalDeployments: 0, storageUsed: '0%', creditsRemaining: '0' });
   const [recentWebsites, setRecentWebsites] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    navigate('/login');
+  };
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -62,14 +70,23 @@ const Dashboard = () => {
           <h1 className="text-4xl font-bold text-white">Welcome Back!</h1>
           <p className="text-slate-400 mt-2">Here's a snapshot of your affiliate empire.</p>
         </div>
-        <button
-          onClick={fetchData}
-          disabled={loading}
-          className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-white font-bold py-2 px-4 rounded-lg transition duration-300 disabled:opacity-50 border border-white/10"
-        >
-          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-          <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={fetchData}
+            disabled={loading}
+            className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-white font-bold py-2 px-4 rounded-lg transition duration-300 disabled:opacity-50 border border-white/10"
+          >
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+            <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
+          </button>
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-white font-bold py-2 px-4 rounded-lg transition duration-300 border border-white/10"
+          >
+            <LogOut size={16} />
+            <span>Logout</span>
+          </button>
+        </div>
       </header>
 
       {error && <p className="text-red-400 mb-4">{error}</p>}
