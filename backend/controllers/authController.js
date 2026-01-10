@@ -28,6 +28,7 @@ const register = async (req, res) => {
     const payload = {
       user: {
         id: user.id,
+        role: user.role,
       },
     };
 
@@ -37,7 +38,10 @@ const register = async (req, res) => {
       { expiresIn: 3600 },
       (err, token) => {
         if (err) throw err;
-        res.json({ token });
+        res.json({
+          token,
+          user: { id: user.id, email: user.email, role: user.role },
+        });
       }
     );
   } catch (err) {
@@ -68,6 +72,7 @@ const login = async (req, res) => {
     const payload = {
       user: {
         id: user.id,
+        role: user.role,
       },
     };
 
@@ -77,7 +82,10 @@ const login = async (req, res) => {
       { expiresIn: 3600 },
       (err, token) => {
         if (err) throw err;
-        res.json({ token });
+        res.json({
+          token,
+          user: { id: user.id, email: user.email, role: user.role },
+        });
       }
     );
   } catch (err) {

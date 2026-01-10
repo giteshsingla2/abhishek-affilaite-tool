@@ -1,9 +1,9 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, PlusCircle, Globe, KeyRound, Settings } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, Globe, KeyRound, Settings, FileText } from 'lucide-react';
 import { cn } from '../lib/utils';
 
-const navItems = [
+const baseNavItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/websites', label: 'My Websites', icon: Globe },
   { href: '/credentials', label: 'Credentials', icon: KeyRound },
@@ -11,6 +11,13 @@ const navItems = [
 ];
 
 const Sidebar = () => {
+  const user = JSON.parse(localStorage.getItem('user'));
+  const isAdmin = user && user.role === 'admin';
+
+  const navItems = [...baseNavItems];
+  if (isAdmin) {
+    navItems.push({ href: '/admin/templates', label: 'Admin Templates', icon: FileText });
+  }
   return (
     <aside className="fixed top-0 left-0 h-full w-64 bg-white/5 backdrop-blur-xl border-r border-white/10 p-6 flex flex-col">
       <div className="flex items-center gap-2 mb-12">

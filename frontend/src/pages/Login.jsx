@@ -21,8 +21,15 @@ const Login = () => {
     const user = { email, password };
     try {
       const res = await axios.post('/api/auth/login', user);
-      localStorage.setItem('token', res.data.token);
-      navigate('/dashboard');
+      const { token, user: userData } = res.data;
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(userData));
+
+      if (userData.role === 'admin') {
+        navigate('/admin/templates');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err) {
       console.error(err.response.data);
     }
