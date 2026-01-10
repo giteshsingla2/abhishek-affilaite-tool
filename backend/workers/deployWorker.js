@@ -1,5 +1,10 @@
 const { Worker, Queue } = require('bullmq');
 const axios = require('axios');
+const dotenv = require('dotenv');
+const path = require('path');
+
+// Load environment variables from the root of the backend folder
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 const Credential = require('../models/Credential');
 const Template = require('../models/Template');
 const Campaign = require('../models/Campaign');
@@ -23,37 +28,38 @@ const stripMarkdownCodeFences = (text) => {
 };
 
 const generateHtml = async (systemPrompt, row) => {
-  const enforcedSystem = `${systemPrompt}\n\nIMPORTANT REQUIREMENTS:\n- Output ONLY a complete, valid HTML document (no markdown, no code fences, no explanations).\n- Use TailwindCSS via CDN in <head> (https://cdn.tailwindcss.com).\n- Use Tailwind utility classes throughout.\n- Include a clear call-to-action linking to the affiliate URL.\n- Do not include <script> tags except the Tailwind CDN script.\n`;
+  const systemRole = "You are a Helpful AI Assistant who create HTML Websites with valid HTML document (no markdown, no code fences, no explanations).";
 
-  const userPrompt = [
-    `name: ${row.name}`,
-    `description: ${row.description}`,
-    `price: ${row.price}`,
-    `image_url: ${row.image_url}`,
-    `affiliate_url: ${row.affiliate_url}`,
-    `logo_url: ${row.logo_url}`,
-    `sub_domain: ${row.sub_domain}`,
-    `meta_keywords: ${row.meta_keywords}`,
-  ].join('\n');
+  let finalHydratedPrompt = systemPrompt;
+  for (const key in row) {
+    if (Object.hasOwnProperty.call(row, key)) {
+      const value = row[key] || '';
+      const placeholder = new RegExp(`\\{${key}\\}`, 'g');
+      finalHydratedPrompt = finalHydratedPrompt.replace(placeholder, value);
+    }
+  }
+
+  // Gracefully handle any remaining placeholders
+  finalHydratedPrompt = finalHydratedPrompt.replace(/\{[a-zA-Z0-9_]+\}/g, '');
 
   try {
     const response = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
-      model: 'openai/gpt-4o',
+      model: 'qwen/qwen3-next-80b-a3b-instruct',
       messages: [
-        { role: 'system', content: enforcedSystem },
-        { role: 'user', content: userPrompt },
+        { role: 'system', content: systemRole },
+        { role: 'user', content: finalHydratedPrompt },
       ],
     }, {
       headers: {
         'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
         'Content-Type': 'application/json',
+        'HTTP-Referer': 'http://localhost:5173',
       }
     });
 
     let htmlContent = response.data.choices[0].message.content;
     htmlContent = stripMarkdownCodeFences(htmlContent);
 
-    // Injection: Add header_code before </head> if provided
     const headerCode = String(row.header_code || '').trim();
     if (headerCode) {
       htmlContent = htmlContent.replace('</head>', `${headerCode}\n</head>`);
