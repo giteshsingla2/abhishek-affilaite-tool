@@ -73,6 +73,7 @@ const generateHtml = async (systemPrompt, row) => {
 };
 
 const worker = new Worker('deploy-queue', async (job) => {
+  console.log(`[JOB_START] Job ${job.id} received with data:`, job.data);
   const { platform, credentialId, templateId, row, campaignId } = job.data;
   const subDomain = row?.sub_domain;
 
@@ -88,24 +89,36 @@ const worker = new Worker('deploy-queue', async (job) => {
     status: 'Pending',
   });
 
-  console.log(`Processing job ${job.id} for platform: ${platform}, websiteId: ${website._id}`);
+  console.log(`[JOB_PROGRESS] ${job.id}: Initial website record created: ${website._id}.`);
 
   try {
+        console.log(`[JOB_PROGRESS] ${job.id}: Step 1 - Fetching template...`);
     // 1. Fetch template prompt
     const template = await Template.findById(templateId);
     if (!template) {
       throw new Error(`Template with ID ${templateId} not found.`);
     }
 
+        console.log(`[JOB_PROGRESS] ${job.id}: Step 1 - Template ${templateId} fetched successfully.`);
+
+    console.log(`[JOB_PROGRESS] ${job.id}: Step 2 - Generating HTML content...`);
     // 2. Generate HTML content
     const htmlContent = await generateHtml(template.systemPrompt, row);
 
+        console.log(`[JOB_PROGRESS] ${job.id}: Step 2 - HTML content generated (length: ${htmlContent.length}).`);
+
+    console.log(`[JOB_PROGRESS] ${job.id}: Step 3 - Fetching credentials...`);
     // 3. Fetch credentials
-    const credential = await Credential.findById(credentialId);
-    if (!credential) {
+    const credentialDoc = await Credential.findById(credentialId);
+    if (!credentialDoc) {
       throw new Error(`Credential with ID ${credentialId} not found.`);
     }
+    const credential = credentialDoc.getDecrypted();
+    console.log(`[JOB_PROGRESS] ${job.id}: Step 3 - Credentials decrypted successfully.`);
 
+        console.log(`[JOB_PROGRESS] ${job.id}: Step 3 - Credentials ${credentialId} fetched successfully.`);
+
+    console.log(`[JOB_PROGRESS] ${job.id}: Step 4 - Uploading to ${platform}...`);
     // 4. Upload to the specified platform
     let result;
     switch (platform) {
@@ -120,16 +133,20 @@ const worker = new Worker('deploy-queue', async (job) => {
         throw new Error(`Unsupported platform: ${platform}`);
     }
 
+        console.log(`[JOB_PROGRESS] ${job.id}: Step 4 - Upload to ${platform} completed. Result:`, result);
+
     if (!result.success) {
       throw new Error(result.error || 'Upload failed for an unknown reason.');
     }
 
+        console.log(`[JOB_PROGRESS] ${job.id}: Step 5 - Updating website document with URL: ${result.url}`);
     // 5. Update website document with final data
     website.status = 'Live';
     website.url = result.url;
     website.htmlContent = htmlContent; // Save the final HTML content
     website.headerCode = String(row.header_code || '').trim(); // Save the header code from CSV
     await website.save();
+    console.log(`[JOB_PROGRESS] ${job.id}: Step 5 - Website document updated successfully.`);
 
     console.log(`Job ${job.id} completed successfully. URL: ${result.url}`);
     return { ...result, websiteId: website._id };
@@ -138,6 +155,7 @@ const worker = new Worker('deploy-queue', async (job) => {
     console.error(`Job ${job.id} failed:`, error.message);
     website.status = 'Failed';
     await website.save();
+    console.log(`[JOB_PROGRESS] ${job.id}: Website status updated to 'Failed'.`);
     throw error;
   }
 }, { connection });
