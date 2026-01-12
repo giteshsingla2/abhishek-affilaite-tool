@@ -9,7 +9,6 @@ const initialFormState = {
   accessKey: '',
   secretKey: '',
   region: '',
-  bucketName: '',
   netlifyAccessToken: '',
   siteId: '',
 };
@@ -18,7 +17,7 @@ const Credentials = () => {
   const [formData, setFormData] = useState(initialFormState);
   const [credentials, setCredentials] = useState([]);
 
-  const { name, platform, accessKey, secretKey, region, bucketName, netlifyAccessToken, siteId } = formData;
+  const { name, platform, accessKey, secretKey, region, netlifyAccessToken, siteId } = formData;
 
   useEffect(() => {
     const fetchCredentials = async () => {
@@ -56,7 +55,6 @@ const Credentials = () => {
           <Input type="text" placeholder="Access Key" name="accessKey" value={accessKey} onChange={onChange} required />
           <Input type="password" placeholder="Secret Key" name="secretKey" value={secretKey} onChange={onChange} required />
           <Input type="text" placeholder="Region" name="region" value={region} onChange={onChange} required />
-          <Input type="text" placeholder="Bucket Name" name="bucketName" value={bucketName} onChange={onChange} required />
         </>
       );
     }

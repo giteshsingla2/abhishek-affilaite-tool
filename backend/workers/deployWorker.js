@@ -124,7 +124,7 @@ const worker = new Worker('deploy-queue', async (job) => {
     switch (platform) {
       case 'aws_s3':
       case 'digital_ocean':
-        result = await uploadToS3(htmlContent, subDomain, credential);
+        result = await uploadToS3(htmlContent, subDomain, credential, campaign);
         break;
       case 'netlify':
         result = await uploadToNetlify(htmlContent, subDomain, credential);

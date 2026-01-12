@@ -55,8 +55,7 @@ router.post('/start', auth, async (req, res) => {
     return res.status(400).json({ msg: 'csvData must be a non-empty array' });
   }
 
-  const platform = platformConfig.platform;
-  const credentialId = platformConfig.credentialId;
+  const { platform, credentialId, bucketName, rootFolder } = platformConfig;
 
   try {
     const template = await Template.findById(templateId);
@@ -84,6 +83,8 @@ router.post('/start', auth, async (req, res) => {
       platform,
       credentialId,
       templateId,
+      bucketName,
+      rootFolder,
     });
 
     let queued = 0;

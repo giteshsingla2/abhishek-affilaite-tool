@@ -30,6 +30,8 @@ const CampaignSchema = new mongoose.Schema({
     ref: 'Template',
     required: true,
   },
+  bucketName: { type: String },
+  rootFolder: { type: String },
   createdAt: {
     type: Date,
     default: Date.now,

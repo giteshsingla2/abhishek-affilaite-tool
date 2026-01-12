@@ -1,7 +1,8 @@
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 
-const uploadToS3 = async (fileContent, subDomain, credentials) => {
-  const { platform, region, bucketName, accessKey, secretKey } = credentials.getDecrypted();
+const uploadToS3 = async (fileContent, subDomain, credentials, campaign) => {
+  const { platform, region, accessKey, secretKey } = credentials;
+  const { bucketName, rootFolder } = campaign;
 
   let s3Options = {
     region,
@@ -20,7 +21,7 @@ const uploadToS3 = async (fileContent, subDomain, credentials) => {
 
   const params = {
     Bucket: bucketName,
-    Key: `${subDomain}/index.html`, // Uploading as index.html in a folder named after the subdomain
+    Key: rootFolder ? `${rootFolder}/${subDomain}/index.html` : `${subDomain}/index.html`,
     Body: fileContent,
     ACL: 'public-read', // Make the file publicly accessible
     ContentType: 'text/html',
@@ -32,10 +33,12 @@ const uploadToS3 = async (fileContent, subDomain, credentials) => {
 
     // Construct the URL of the uploaded file
     let url;
+        const keyPath = rootFolder ? `${rootFolder}/${subDomain}/index.html` : `${subDomain}/index.html`;
+
     if (platform === 'digital_ocean') {
-      url = `https://${bucketName}.${region}.digitaloceanspaces.com/${subDomain}/index.html`;
+      url = `https://${bucketName}.${region}.digitaloceanspaces.com/${keyPath}`;
     } else { // AWS S3
-      url = `https://${bucketName}.s3.${region}.amazonaws.com/${subDomain}/index.html`;
+      url = `https://${bucketName}.s3.${region}.amazonaws.com/${keyPath}`;
     }
     return { success: true, url };
 

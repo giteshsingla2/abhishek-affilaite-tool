@@ -39,6 +39,8 @@ const CreateCampaign = () => {
   const [credentialId, setCredentialId] = useState('');
   const [loadingCredentials, setLoadingCredentials] = useState(false);
   const [campaignName, setCampaignName] = useState('');
+  const [bucketName, setBucketName] = useState('');
+  const [rootFolder, setRootFolder] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -194,6 +196,8 @@ const CreateCampaign = () => {
           platformConfig: {
             platform,
             credentialId,
+            bucketName,
+            rootFolder,
           },
           csvData,
         },
@@ -415,6 +419,30 @@ const CreateCampaign = () => {
                   <option value="netlify">Netlify</option>
                 </select>
               </div>
+
+              {(platform === 'aws_s3' || platform === 'digital_ocean') && (
+                <>
+                  <div>
+                    <label className="block text-white/80 mb-2">Bucket Name</label>
+                    <input
+                      className="w-full p-3 mb-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      value={bucketName}
+                      onChange={(e) => setBucketName(e.target.value)}
+                      placeholder="e.g., my-affiliate-sites-bucket"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-white/80 mb-2">Root Folder (Optional)</label>
+                    <input
+                      className="w-full p-3 mb-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      value={rootFolder}
+                      onChange={(e) => setRootFolder(e.target.value)}
+                      placeholder="e.g., campaign-v1"
+                    />
+                  </div>
+                </>
+              )}
 
               <div className="md:col-span-2">
                 <div className="flex items-center justify-between gap-4 flex-wrap">

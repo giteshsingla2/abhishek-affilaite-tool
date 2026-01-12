@@ -20,7 +20,6 @@ const CredentialSchema = new mongoose.Schema({
   accessKey: { type: String },
   secretKey: { type: String },
   region: { type: String },
-  bucketName: { type: String },
   // Netlify
   netlifyAccessToken: { type: String },
   siteId: { type: String },
