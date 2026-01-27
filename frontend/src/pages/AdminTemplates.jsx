@@ -99,6 +99,13 @@ const AdminTemplates = () => {
               )}
               <div className="p-4 flex-grow flex flex-col">
                 <h3 className="font-bold text-white text-lg mb-2 flex-grow">{template.name}</h3>
+                {template.requiredCsvHeaders && template.requiredCsvHeaders.length > 0 && (
+                  <div className="mb-2 flex flex-wrap gap-1">
+                    {template.requiredCsvHeaders.map(header => (
+                      <span key={header} className="bg-purple-500/20 text-purple-300 text-xs font-medium px-2 py-1 rounded-full">{header}</span>
+                    ))}
+                  </div>
+                )}
                 <div className="flex justify-end items-center gap-2 mt-4">
                   <button onClick={() => openModal(template)} className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"><Edit size={16}/></button>
                   <button 
@@ -126,6 +133,7 @@ const TemplateModal = ({ template, onClose, onSubmit }) => {
         name: template?.name || '',
         thumbnailUrl: template?.thumbnailUrl || '',
         systemPrompt: template?.systemPrompt || '',
+        requiredCsvHeaders: template?.requiredCsvHeaders?.join(', ') || '',
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -137,7 +145,11 @@ const TemplateModal = ({ template, onClose, onSubmit }) => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsSubmitting(true);
-        await onSubmit(formData);
+        const submissionData = {
+          ...formData,
+          requiredCsvHeaders: formData.requiredCsvHeaders.split(',').map(h => h.trim()).filter(h => h),
+        };
+        await onSubmit(submissionData);
         setIsSubmitting(false);
     };
 
@@ -172,6 +184,10 @@ const TemplateModal = ({ template, onClose, onSubmit }) => {
                     <div>
                         <label htmlFor="systemPrompt" className="block text-sm font-medium text-gray-300 mb-1">System Prompt</label>
                         <textarea name="systemPrompt" id="systemPrompt" value={formData.systemPrompt} onChange={handleChange} required rows="10" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"></textarea>
+                    </div>
+                    <div>
+                        <label htmlFor="requiredCsvHeaders" className="block text-sm font-medium text-gray-300 mb-1">Required CSV Headers (comma-separated)</label>
+                        <input type="text" name="requiredCsvHeaders" id="requiredCsvHeaders" value={formData.requiredCsvHeaders} onChange={handleChange} placeholder="e.g., name, price, description, affiliate_url" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500" />
                     </div>
                     <div className="flex justify-end pt-4">
                         <button type="submit" disabled={isSubmitting} className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition-colors disabled:opacity-50">

@@ -1,39 +1,24 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import Papa from 'papaparse';
 import axios from 'axios';
 import GlassCard from '../components/GlassCard';
 
-const HEADERS = [
-  'name',
-  'description',
-  'price',
-  'image_url',
-  'affiliate_url',
-  'logo_url',
-  'sub_domain',
-  'header_code',
-  'meta_keywords',
-];
-
-const REQUIRED_FIELDS = ['name', 'description', 'affiliate_url', 'sub_domain'];
 const MAX_PREVIEW_ROWS = 30;
-
-const emptyRow = () =>
-  HEADERS.reduce((acc, h) => {
-    acc[h] = '';
-    return acc;
-  }, {});
 
 const CreateCampaign = () => {
   const [step, setStep] = useState(1);
 
-  const [csvData, setCsvData] = useState([]);
-  const [parseError, setParseError] = useState('');
-
+  // Step 1: Template Selection
   const [templates, setTemplates] = useState([]);
-  const [templateId, setTemplateId] = useState('');
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
 
+  // Step 2: CSV Upload
+  const [csvData, setCsvData] = useState([]);
+  const [csvHeaders, setCsvHeaders] = useState([]);
+  const [parseError, setParseError] = useState('');
+
+  // Step 3: Deployment
   const [platform, setPlatform] = useState('aws_s3');
   const [credentials, setCredentials] = useState([]);
   const [credentialId, setCredentialId] = useState('');
@@ -42,30 +27,38 @@ const CreateCampaign = () => {
   const [bucketName, setBucketName] = useState('');
   const [rootFolder, setRootFolder] = useState('');
 
+  // Submission state
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [submitResult, setSubmitResult] = useState(null);
 
   const previewRows = useMemo(() => csvData.slice(0, MAX_PREVIEW_ROWS), [csvData]);
 
-  const validateRow = (row) => {
-    const missing = REQUIRED_FIELDS.filter((f) => String(row?.[f] || '').trim() === '');
+  const validateRow = useCallback((row) => {
+    if (!selectedTemplate) return { isValid: false, missing: [] };
+    const missing = selectedTemplate.requiredCsvHeaders.filter((f) => String(row?.[f] || '').trim() === '');
     return { isValid: missing.length === 0, missing };
-  };
+  }, [selectedTemplate]);
 
   const invalidCount = useMemo(() => {
+    if (!selectedTemplate) return 0;
     return csvData.reduce((count, row) => {
       const v = validateRow(row);
       return count + (v.isValid ? 0 : 1);
     }, 0);
-  }, [csvData]);
+  }, [csvData, validateRow, selectedTemplate]);
 
   const parseCsvFile = (file) => {
     setParseError('');
     setSubmitError('');
     setSubmitResult(null);
     setCsvData([]);
-    setTemplateId('');
+    setCsvHeaders([]);
+
+    if (!selectedTemplate) {
+        setParseError('Please select a template before uploading a file.');
+        return;
+    }
 
     Papa.parse(file, {
       header: true,
@@ -78,38 +71,21 @@ const CreateCampaign = () => {
         }
 
         const fields = (results.meta?.fields || []).map((f) => String(f || '').trim());
-        const missingHeaders = HEADERS.filter((h) => !fields.includes(h));
-        const extraHeaders = fields.filter((h) => !HEADERS.includes(h));
+        const missingHeaders = selectedTemplate.requiredCsvHeaders.filter((h) => !fields.includes(h));
 
         if (missingHeaders.length) {
-          setParseError(
-            `CSV missing required headers: ${missingHeaders.join(', ')}. Required headers are exactly: ${HEADERS.join(', ')}`
-          );
+          setParseError(`CSV is missing required columns: ${missingHeaders.join(', ')}.`);
           return;
         }
 
-        if (extraHeaders.length) {
-          setParseError(
-            `CSV has unsupported headers: ${extraHeaders.join(', ')}. Required headers are exactly: ${HEADERS.join(', ')}`
-          );
-          return;
-        }
-
-        const data = (results.data || [])
-          .map((r) => {
-            const normalized = emptyRow();
-            HEADERS.forEach((h) => {
-              normalized[h] = r?.[h] != null ? String(r[h]) : '';
-            });
-            return normalized;
-          })
-          .filter((r) => Object.values(r).some((v) => String(v || '').trim() !== ''));
+        const data = (results.data || []).filter((r) => Object.values(r).some((v) => String(v || '').trim() !== ''));
 
         if (!data.length) {
-          setParseError('CSV had no rows.');
+          setParseError('CSV file is empty or contains no data.');
           return;
         }
 
+        setCsvHeaders(fields);
         setCsvData(data);
       },
     });
@@ -129,20 +105,21 @@ const CreateCampaign = () => {
     });
   };
 
-  const fetchTemplates = async () => {
+  const fetchTemplates = useCallback(async () => {
     setLoadingTemplates(true);
     setSubmitError('');
     try {
-      const res = await axios.get('/api/templates');
+      const token = localStorage.getItem('token');
+      const res = await axios.get('/api/templates', { headers: { 'x-auth-token': token } });
       setTemplates(res.data || []);
     } catch (err) {
       setSubmitError(err?.response?.data?.msg || 'Failed to load templates');
     } finally {
       setLoadingTemplates(false);
     }
-  };
+  }, []);
 
-  const fetchCredentials = async (selectedPlatform) => {
+  const fetchCredentials = useCallback(async (selectedPlatform) => {
     setLoadingCredentials(true);
     setSubmitError('');
     try {
@@ -161,22 +138,33 @@ const CreateCampaign = () => {
     } finally {
       setLoadingCredentials(false);
     }
-  };
+  }, [credentialId]);
+  
+  useEffect(() => {
+    if (step === 1) {
+      fetchTemplates();
+    }
+  }, [step, fetchTemplates]);
 
-  const goToStep2 = async () => {
-    if (!csvData.length) {
-      setParseError('Upload a CSV first.');
+  const goToStep2 = () => {
+    if (!selectedTemplate) {
+      setSubmitError('Please select a template to continue.');
       return;
     }
-    await fetchTemplates();
+    setSubmitError('');
     setStep(2);
   };
 
   const goToStep3 = async () => {
-    if (!templateId) {
-      setSubmitError('Select a template.');
+    if (!csvData.length) {
+      setParseError('Please upload a valid CSV file to continue.');
       return;
     }
+    if (invalidCount > 0) {
+        setParseError('Please fix the invalid rows before proceeding.');
+        return;
+    }
+    setParseError('');
     await fetchCredentials(platform);
     setStep(3);
   };
@@ -192,7 +180,7 @@ const CreateCampaign = () => {
         '/api/campaigns/start',
         {
           campaignName,
-          templateId,
+          templateId: selectedTemplate?._id,
           platformConfig: {
             platform,
             credentialId,
@@ -224,32 +212,30 @@ const CreateCampaign = () => {
       <div className="max-w-5xl mx-auto space-y-6">
         <GlassCard className="p-6">
           <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div className="text-white/80">
-              Step {step} of 3
-            </div>
+            <div className="text-white/80">Step {step} of 3</div>
             <div className="flex gap-2">
               <button
                 className={`px-4 py-2 rounded-lg border border-white/10 ${step === 1 ? 'bg-white/10' : 'bg-transparent hover:bg-white/5'}`}
                 onClick={() => setStep(1)}
                 type="button"
               >
-                Upload CSV
+                1. Select Template
               </button>
               <button
                 className={`px-4 py-2 rounded-lg border border-white/10 ${step === 2 ? 'bg-white/10' : 'bg-transparent hover:bg-white/5'}`}
-                onClick={() => setStep(2)}
+                onClick={goToStep2}
                 type="button"
-                disabled={!csvData.length}
+                disabled={!selectedTemplate}
               >
-                Select Credential
+                2. Upload Data
               </button>
               <button
                 className={`px-4 py-2 rounded-lg border border-white/10 ${step === 3 ? 'bg-white/10' : 'bg-transparent hover:bg-white/5'}`}
-                onClick={() => setStep(3)}
+                onClick={goToStep3}
                 type="button"
-                disabled={!csvData.length || !templateId}
+                disabled={!csvData.length || !selectedTemplate || invalidCount > 0}
               >
-                Submit
+                3. Deployment
               </button>
             </div>
           </div>
@@ -257,15 +243,76 @@ const CreateCampaign = () => {
 
         {step === 1 && (
           <GlassCard className="p-6">
-            <h2 className="text-2xl font-bold mb-4">Step 1: Upload CSV</h2>
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <h2 className="text-2xl font-bold">Step 1: Select Template</h2>
+              <button
+                type="button"
+                onClick={fetchTemplates}
+                disabled={loadingTemplates}
+                className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/10"
+              >
+                {loadingTemplates ? 'Loading...' : 'Refresh'}
+              </button>
+            </div>
+
+            <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {templates.map((t) => {
+                const isSelected = selectedTemplate?._id === t._id;
+                return (
+                  <button
+                    type="button"
+                    key={t._id}
+                    onClick={() => setSelectedTemplate(t)}
+                    className={`text-left rounded-2xl border p-4 bg-white/5 hover:bg-white/10 transition ${isSelected ? 'border-purple-500 ring-2 ring-purple-500' : 'border-white/10'}`}
+                  >
+                    <div className="w-full h-28 rounded-xl bg-white/5 border border-white/10 overflow-hidden mb-3">
+                      {t.thumbnailUrl ? (
+                        <img src={t.thumbnailUrl} alt={t.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-white/50 text-sm">
+                          No thumbnail
+                        </div>
+                      )}
+                    </div>
+                    <div className="font-semibold text-white mb-2">{t.name}</div>
+                    {t.requiredCsvHeaders && t.requiredCsvHeaders.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {t.requiredCsvHeaders.map(header => (
+                          <span key={header} className="bg-purple-500/20 text-purple-300 text-xs font-medium px-2 py-1 rounded-full">{header}</span>
+                        ))}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex justify-end mt-6">
+              <button
+                type="button"
+                onClick={goToStep2}
+                disabled={!selectedTemplate}
+                className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 disabled:opacity-50"
+              >
+                Next: Upload Data
+              </button>
+            </div>
+
+            {submitError && <p className="mt-4 text-red-300">{submitError}</p>}
+          </GlassCard>
+        )}
+
+        {step === 2 && (
+          <GlassCard className="p-6">
+            <h2 className="text-2xl font-bold mb-4">Step 2: Upload Data (CSV)</h2>
             <div className="w-full rounded-2xl border border-white/10 bg-white/5 p-8">
               <div className="text-white/80 mb-4">
-                Dropzone (use file picker for now). Required headers exactly:
+                This template requires the following columns:
               </div>
-              <div className="text-white/70 font-mono text-sm break-words">
-                [{HEADERS.join(', ')}]
+              <div className="text-white/70 font-mono text-sm break-words mb-6">
+                [{selectedTemplate?.requiredCsvHeaders.join(', ')}]
               </div>
-              <div className="mt-6">
+              <div>
                 <input
                   type="file"
                   accept=".csv,text/csv"
@@ -288,10 +335,10 @@ const CreateCampaign = () => {
                   </p>
                   <button
                     type="button"
-                    onClick={goToStep2}
+                    onClick={goToStep3}
                     className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300"
                   >
-                    Next: Select Template
+                    Next: Deployment
                   </button>
                 </div>
 
@@ -299,7 +346,7 @@ const CreateCampaign = () => {
                   <table className="min-w-full text-sm">
                     <thead className="bg-white/5">
                       <tr>
-                        {HEADERS.map((c) => (
+                        {csvHeaders.map((c) => (
                           <th key={c} className="text-left px-4 py-3 font-semibold text-white/90 whitespace-nowrap">
                             {c}
                           </th>
@@ -314,7 +361,7 @@ const CreateCampaign = () => {
                             key={idx}
                             className={`border-t border-white/10 ${isValid ? '' : 'bg-red-500/15'}`}
                           >
-                            {HEADERS.map((c) => (
+                            {csvHeaders.map((c) => (
                               <td key={c} className="px-2 py-2 text-white/80 align-top">
                                 <input
                                   className="w-full bg-transparent border border-white/10 rounded-lg px-2 py-1 text-white/90 focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -331,60 +378,6 @@ const CreateCampaign = () => {
                 </div>
               </div>
             )}
-          </GlassCard>
-        )}
-
-        {step === 2 && (
-          <GlassCard className="p-6">
-            <div className="flex items-center justify-between flex-wrap gap-4">
-              <h2 className="text-2xl font-bold">Step 2: Select Template</h2>
-              <button
-                type="button"
-                onClick={fetchTemplates}
-                disabled={loadingTemplates}
-                className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/10"
-              >
-                {loadingTemplates ? 'Loading...' : 'Refresh'}
-              </button>
-            </div>
-
-            <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {templates.map((t) => {
-                const selected = templateId === t._id;
-                return (
-                  <button
-                    type="button"
-                    key={t._id}
-                    onClick={() => setTemplateId(t._id)}
-                    className={`text-left rounded-2xl border p-4 bg-white/5 hover:bg-white/10 transition ${selected ? 'border-blue-500' : 'border-white/10'}`}
-                  >
-                    <div className="w-full h-28 rounded-xl bg-white/5 border border-white/10 overflow-hidden mb-3">
-                      {t.thumbnailUrl ? (
-                        <img src={t.thumbnailUrl} alt={t.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-white/50 text-sm">
-                          No thumbnail
-                        </div>
-                      )}
-                    </div>
-                    <div className="font-semibold text-white">{t.name}</div>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="flex justify-end mt-6">
-              <button
-                type="button"
-                onClick={goToStep3}
-                disabled={!templateId}
-                className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 disabled:opacity-50"
-              >
-                Next: Deployment
-              </button>
-            </div>
-
-            {submitError && <p className="mt-4 text-red-300">{submitError}</p>}
           </GlassCard>
         )}
 
@@ -473,26 +466,16 @@ const CreateCampaign = () => {
               </div>
             </div>
 
-            <div className="mt-4 text-white/80">
-              <p>
-                Rows: <span className="font-semibold">{csvData.length}</span>
-                {invalidCount > 0 && (
-                  <span className="ml-3 text-red-300">{invalidCount} invalid row(s) will be skipped</span>
-                )}
-              </p>
-            </div>
-
             <div className="flex justify-end mt-6">
               <button
                 type="button"
                 onClick={submitCampaign}
-                disabled={submitting || !csvData.length || !templateId || !credentialId || !campaignName}
+                disabled={submitting || !csvData.length || !selectedTemplate || !credentialId || !campaignName}
                 className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 disabled:opacity-50"
               >
                 {submitting ? 'Submitting...' : 'Start Campaign'}
               </button>
             </div>
-
             {submitError && <p className="mt-4 text-red-300">{submitError}</p>}
 
             {submitResult && (

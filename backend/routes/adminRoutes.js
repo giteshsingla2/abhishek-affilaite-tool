@@ -8,13 +8,14 @@ const Template = require('../models/Template');
 // @desc    Create a new template
 // @access  Admin
 router.post('/templates', [auth, admin], async (req, res) => {
-  const { name, thumbnailUrl, systemPrompt } = req.body;
+  const { name, thumbnailUrl, systemPrompt, requiredCsvHeaders } = req.body;
 
   try {
     const newTemplate = new Template({
       name,
       thumbnailUrl,
       systemPrompt,
+      requiredCsvHeaders,
     });
 
     const template = await newTemplate.save();
@@ -29,7 +30,7 @@ router.post('/templates', [auth, admin], async (req, res) => {
 // @desc    Update a template
 // @access  Admin
 router.put('/templates/:id', [auth, admin], async (req, res) => {
-  const { name, thumbnailUrl, systemPrompt } = req.body;
+  const { name, thumbnailUrl, systemPrompt, requiredCsvHeaders } = req.body;
 
   try {
     let template = await Template.findById(req.params.id);
@@ -38,6 +39,7 @@ router.put('/templates/:id', [auth, admin], async (req, res) => {
     template.name = name || template.name;
     template.thumbnailUrl = thumbnailUrl || template.thumbnailUrl;
     template.systemPrompt = systemPrompt || template.systemPrompt;
+    template.requiredCsvHeaders = requiredCsvHeaders || template.requiredCsvHeaders;
 
     await template.save();
     res.json(template);
