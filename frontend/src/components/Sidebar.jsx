@@ -1,13 +1,12 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, PlusCircle, Globe, KeyRound, Settings, FileText } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, Globe, KeyRound, FileText } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 const baseNavItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/websites', label: 'My Websites', icon: Globe },
   { href: '/credentials', label: 'Credentials', icon: KeyRound },
-  { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
 const Sidebar = () => {

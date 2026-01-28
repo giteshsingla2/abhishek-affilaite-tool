@@ -20,10 +20,16 @@ const encrypt = (text) => {
 };
 
 const decrypt = (encryptedText) => {
-  const decipher = crypto.createDecipheriv(algorithm, key, iv);
-  let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
-  decrypted += decipher.final('utf8');
-  return decrypted;
+  try {
+    if (!encryptedText) return '';
+    const decipher = crypto.createDecipheriv(algorithm, key, iv);
+    let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    return decrypted;
+  } catch (err) {
+    console.error('[ERROR] Decryption failed:', err.message);
+    return ''; // Return empty string or handle as needed
+  }
 };
 
 module.exports = { encrypt, decrypt };

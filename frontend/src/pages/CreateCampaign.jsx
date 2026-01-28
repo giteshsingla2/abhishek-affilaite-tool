@@ -26,6 +26,13 @@ const CreateCampaign = () => {
   const [campaignName, setCampaignName] = useState('');
   const [bucketName, setBucketName] = useState('');
   const [rootFolder, setRootFolder] = useState('');
+  const [isCreatingNewFolder, setIsCreatingNewFolder] = useState(false);
+
+  // S3 Listing state
+  const [buckets, setBuckets] = useState([]);
+  const [loadingBuckets, setLoadingBuckets] = useState(false);
+  const [folders, setFolders] = useState([]);
+  const [loadingFolders, setLoadingFolders] = useState(false);
 
   // Submission state
   const [submitting, setSubmitting] = useState(false);
@@ -130,6 +137,11 @@ const CreateCampaign = () => {
 
       const filtered = (res.data || []).filter((c) => c.platform === selectedPlatform);
       setCredentials(filtered);
+      
+      // Clear buckets/folders when switching platforms or credentials
+      setBuckets([]);
+      setFolders([]);
+
       if (!filtered.some((c) => c._id === credentialId)) {
         setCredentialId(filtered[0]?._id || '');
       }
@@ -139,6 +151,57 @@ const CreateCampaign = () => {
       setLoadingCredentials(false);
     }
   }, [credentialId]);
+
+  const fetchBuckets = useCallback(async (credId) => {
+    if (!credId || (platform !== 'aws_s3' && platform !== 'digital_ocean')) return;
+    setLoadingBuckets(true);
+    setSubmitError('');
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.get(`/api/credentials/${credId}/buckets`, {
+        headers: { 'x-auth-token': token },
+      });
+      setBuckets(res.data || []);
+    } catch (err) {
+      console.error('Failed to fetch buckets:', err);
+      const msg = err?.response?.data?.msg || err?.response?.data?.error || 'Failed to fetch buckets';
+      setSubmitError(`S3 Error: ${msg}`);
+    } finally {
+      setLoadingBuckets(false);
+    }
+  }, [platform]);
+
+  const fetchFolders = useCallback(async (credId, bName) => {
+    if (!credId || !bName) return;
+    setLoadingFolders(true);
+    setSubmitError('');
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.get(`/api/credentials/${credId}/folders`, {
+        params: { bucketName: bName },
+        headers: { 'x-auth-token': token },
+      });
+      setFolders(res.data || []);
+    } catch (err) {
+      console.error('Failed to fetch folders:', err);
+      const msg = err?.response?.data?.msg || err?.response?.data?.error || 'Failed to fetch folders';
+      setSubmitError(`S3 Error: ${msg}`);
+    } finally {
+      setLoadingFolders(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (credentialId && (platform === 'aws_s3' || platform === 'digital_ocean')) {
+      fetchBuckets(credentialId);
+    }
+  }, [credentialId, platform, fetchBuckets]);
+
+  useEffect(() => {
+    if (credentialId && bucketName) {
+      fetchFolders(credentialId, bucketName);
+    }
+  }, [credentialId, bucketName, fetchFolders]);
   
   useEffect(() => {
     if (step === 1) {
@@ -428,22 +491,87 @@ const CreateCampaign = () => {
                 <>
                   <div>
                     <label className="block text-white/80 mb-2">Bucket Name</label>
-                    <input
-                      className="w-full p-3 mb-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      value={bucketName}
-                      onChange={(e) => setBucketName(e.target.value)}
-                      placeholder="e.g., my-affiliate-sites-bucket"
-                      required
-                    />
+                    <div className="flex gap-2">
+                      <select
+                        className="w-full p-3 mb-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        value={bucketName}
+                        onChange={(e) => setBucketName(e.target.value)}
+                        required
+                      >
+                        <option value="">Select a bucket</option>
+                        {buckets.map((b) => (
+                          <option key={b} value={b}>{b}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => fetchBuckets(credentialId)}
+                        disabled={loadingBuckets || !credentialId}
+                        className="p-3 mb-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/10"
+                        title="Refresh Buckets"
+                      >
+                        {loadingBuckets ? '...' : '↻'}
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <label className="block text-white/80 mb-2">Root Folder (Optional)</label>
-                    <input
-                      className="w-full p-3 mb-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      value={rootFolder}
-                      onChange={(e) => setRootFolder(e.target.value)}
-                      placeholder="e.g., campaign-v1"
-                    />
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        {!isCreatingNewFolder ? (
+                          <select
+                            className="w-full p-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            value={rootFolder}
+                            onChange={(e) => {
+                              if (e.target.value === '___NEW___') {
+                                setIsCreatingNewFolder(true);
+                                setRootFolder('');
+                              } else {
+                                setRootFolder(e.target.value);
+                              }
+                            }}
+                          >
+                            <option value="">(Root)</option>
+                            {folders.map((f) => (
+                              <option key={f} value={f}>{f}</option>
+                            ))}
+                            <option value="___NEW___">+ Create New Folder</option>
+                          </select>
+                        ) : (
+                          <div className="relative w-full">
+                            <input
+                              className="w-full p-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                              value={rootFolder}
+                              onChange={(e) => setRootFolder(e.target.value)}
+                              placeholder="Type new folder name..."
+                              autoFocus
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsCreatingNewFolder(false);
+                                setRootFolder('');
+                              }}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 hover:text-white"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => fetchFolders(credentialId, bucketName)}
+                          disabled={loadingFolders || !bucketName}
+                          className="p-3 rounded-lg bg-white/10 hover:bg-white/20 border border-white/10"
+                          title="Refresh Folders"
+                        >
+                          {loadingFolders ? '...' : '↻'}
+                        </button>
+                      </div>
+                      {isCreatingNewFolder && (
+                        <p className="text-xs text-purple-300">Enter a name for the new folder. It will be created upon deployment.</p>
+                      )}
+                    </div>
                   </div>
                 </>
               )}
