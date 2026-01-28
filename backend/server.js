@@ -22,7 +22,6 @@ app.use(express.json());
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/credentials', require('./routes/credentialRoutes'));
 app.use('/api/test-upload', require('./routes/testUploadRoutes'));
-app.use('/api/campaign', require('./routes/campaignRoutes'));
 app.use('/api/templates', require('./routes/templateRoutes'));
 app.use('/api/campaigns', require('./routes/campaignsRoutes'));
 app.use('/api/websites', require('./routes/websiteRoutes'));

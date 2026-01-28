@@ -8,7 +8,12 @@ const Template = require('../models/Template');
 // @desc    Create a new template
 // @access  Admin
 router.post('/templates', [auth, admin], async (req, res) => {
-  const { name, thumbnailUrl, systemPrompt, requiredCsvHeaders } = req.body;
+  let { name, thumbnailUrl, systemPrompt, requiredCsvHeaders } = req.body;
+
+  // If requiredCsvHeaders is a string, split it into an array
+  if (typeof requiredCsvHeaders === 'string') {
+    requiredCsvHeaders = requiredCsvHeaders.split(',').map((h) => h.trim()).filter((h) => h !== '');
+  }
 
   try {
     const newTemplate = new Template({
@@ -30,7 +35,12 @@ router.post('/templates', [auth, admin], async (req, res) => {
 // @desc    Update a template
 // @access  Admin
 router.put('/templates/:id', [auth, admin], async (req, res) => {
-  const { name, thumbnailUrl, systemPrompt, requiredCsvHeaders } = req.body;
+  let { name, thumbnailUrl, systemPrompt, requiredCsvHeaders } = req.body;
+
+  // If requiredCsvHeaders is a string, split it into an array
+  if (typeof requiredCsvHeaders === 'string') {
+    requiredCsvHeaders = requiredCsvHeaders.split(',').map((h) => h.trim()).filter((h) => h !== '');
+  }
 
   try {
     let template = await Template.findById(req.params.id);

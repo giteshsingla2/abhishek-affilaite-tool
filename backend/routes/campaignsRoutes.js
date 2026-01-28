@@ -7,34 +7,8 @@ const Credential = require('../models/Credential');
 const Template = require('../models/Template');
 const { deployQueue } = require('../workers/deployWorker');
 
-const REQUIRED_HEADERS = [
-  'name',
-  'description',
-  'price',
-  'image_url',
-  'affiliate_url',
-  'logo_url',
-  'sub_domain',
-  'header_code',
-  'meta_keywords',
-];
-
-const REQUIRED_FIELDS = ['name', 'description', 'affiliate_url', 'sub_domain'];
-
-const normalizeRow = (row) => {
-  const normalized = {};
-  REQUIRED_HEADERS.forEach((h) => {
-    normalized[h] = row && row[h] != null ? String(row[h]) : '';
-  });
-  return normalized;
-};
-
-const missingRequired = (row) => {
-  return REQUIRED_FIELDS.filter((f) => String(row?.[f] || '').trim() === '');
-};
-
 // @route   POST /api/campaigns/start
-// @desc    Save campaign + enqueue one job per csv row
+// @desc    Save campaign + enqueue one job per csv row (Dynamic Headers Support)
 // @access  Private
 router.post('/start', auth, async (req, res) => {
   const { campaignName, templateId, platformConfig, csvData } = req.body;
@@ -58,11 +32,13 @@ router.post('/start', auth, async (req, res) => {
   const { platform, credentialId, bucketName, rootFolder } = platformConfig;
 
   try {
+    // 1. Fetch Template to ensure it exists
     const template = await Template.findById(templateId);
     if (!template) {
       return res.status(404).json({ msg: 'Template not found' });
     }
 
+    // 2. Fetch & Validate Credential
     const credential = await Credential.findById(credentialId);
     if (!credential) {
       return res.status(404).json({ msg: 'Credential not found' });
@@ -76,6 +52,7 @@ router.post('/start', auth, async (req, res) => {
       return res.status(400).json({ msg: 'Selected credential platform does not match selected platform' });
     }
 
+    // 3. Create Campaign Record
     const campaign = await Campaign.create({
       userId: req.user.id,
       name: String(campaignName).trim(),
@@ -87,13 +64,27 @@ router.post('/start', auth, async (req, res) => {
       rootFolder,
     });
 
+    // 4. Queue Jobs (DYNAMICALLY)
     let queued = 0;
+    console.log(`[CAMPAIGN_START] csvData type: ${typeof csvData}, isArray: ${Array.isArray(csvData)}, length: ${csvData?.length}`);
+    console.log(`[CAMPAIGN_START] Required Headers:`, template.requiredCsvHeaders);
 
     for (let i = 0; i < csvData.length; i++) {
-      const normalized = normalizeRow(csvData[i]);
-      const missing = missingRequired(normalized);
+      const row = csvData[i];
+      
+      // Basic check for empty row
+      if (!row || Object.keys(row).length === 0) {
+        console.log(`[CAMPAIGN_START] Skipping row ${i} - empty`);
+        continue;
+      }
 
-      if (missing.length) {
+      // Dynamic validation against template required headers
+      const missing = (template.requiredCsvHeaders || []).filter(
+        (h) => !row[h] || String(row[h]).trim() === ''
+      );
+
+      if (missing.length > 0) {
+        console.log(`[CAMPAIGN_START] Skipping row ${i} - missing required fields: ${missing.join(', ')}`);
         continue;
       }
 
@@ -102,7 +93,9 @@ router.post('/start', auth, async (req, res) => {
         platform,
         credentialId,
         templateId,
-        row: normalized,
+        row: row, // Pass the RAW row so custom headers work
+        bucketName, // Pass dynamic bucket info
+        rootFolder
       });
 
       queued++;

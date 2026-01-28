@@ -85,7 +85,7 @@ const worker = new Worker('deploy-queue', async (job) => {
   const website = await Website.create({
     userId: campaign.userId,
     campaignId,
-    productName: row.name,
+    productName: row.name || row.product_name || row.productName || row.main_product || 'Unnamed Product',
     status: 'Pending',
   });
 

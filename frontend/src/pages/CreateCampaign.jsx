@@ -176,6 +176,17 @@ const CreateCampaign = () => {
 
     try {
       const token = localStorage.getItem('token');
+      console.log('[DEBUG] Submitting campaign with payload:', {
+        campaignName,
+        templateId: selectedTemplate?._id,
+        platformConfig: {
+          platform,
+          credentialId,
+          bucketName,
+          rootFolder,
+        },
+        csvData,
+      });
       const res = await axios.post(
         '/api/campaigns/start',
         {
