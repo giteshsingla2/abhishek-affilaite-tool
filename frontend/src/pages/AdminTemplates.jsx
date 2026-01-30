@@ -14,7 +14,7 @@ const AdminTemplates = () => {
   const fetchTemplates = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('/api/templates', {
+      const response = await axios.get('/api/admin/templates', {
         headers: { 'x-auth-token': token },
       });
       setTemplates(response.data);

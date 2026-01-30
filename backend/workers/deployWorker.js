@@ -44,7 +44,7 @@ const generateHtml = async (systemPrompt, row) => {
 
   try {
     const response = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
-      model: 'qwen/qwen3-next-80b-a3b-instruct',
+      model: process.env.OPENROUTER_MODEL,
       messages: [
         { role: 'system', content: systemRole },
         { role: 'user', content: finalHydratedPrompt },

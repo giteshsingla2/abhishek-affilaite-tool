@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, PlusCircle, Globe, KeyRound, FileText } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, Globe, KeyRound, FileText, Users } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 const baseNavItems = [
@@ -16,6 +16,7 @@ const Sidebar = () => {
   const navItems = [...baseNavItems];
   if (isAdmin) {
     navItems.push({ href: '/admin/templates', label: 'Admin Templates', icon: FileText });
+    navItems.push({ href: '/admin/users', label: 'User Management', icon: Users });
   }
   return (
     <aside className="fixed top-0 left-0 h-full w-64 bg-white/5 backdrop-blur-xl border-r border-white/10 p-6 flex flex-col">

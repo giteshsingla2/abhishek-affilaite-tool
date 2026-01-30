@@ -17,6 +17,11 @@ const TemplateSchema = new mongoose.Schema({
     type: [String],
     default: [],
   },
+  addedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+  },
   createdAt: {
     type: Date,
     default: Date.now,

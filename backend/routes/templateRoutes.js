@@ -16,10 +16,14 @@ router.get('/', async (req, res) => {
   }
 });
 
+const auth = require('../middleware/authMiddleware');
+const admin = require('../middleware/adminMiddleware');
+const User = require('../models/User');
+
 // @route   POST /api/templates/seed
 // @desc    Seed 3 default templates (idempotent by name)
-// @access  Public
-router.post('/seed', async (req, res) => {
+// @access  Admin
+router.post('/seed', [auth, admin], async (req, res) => {
   try {
     const defaults = [
       {
@@ -27,18 +31,21 @@ router.post('/seed', async (req, res) => {
         thumbnailUrl: '',
         systemPrompt:
           'Create a clean, white-space heavy review site. Use a minimalist aesthetic, subtle borders, and clear typography. Prioritize readability and trust. Include product hero, pros/cons, key features, review summary, and a strong call-to-action.',
+        addedBy: req.user.id,
       },
       {
         name: 'High Energy Sales',
         thumbnailUrl: '',
         systemPrompt:
           'Create a bold, urgent sales page with high contrast sections, strong headlines, and urgency elements (like red countdown timers). Use energetic design patterns, punchy copy, and repeated calls-to-action. The tone should feel exciting and time-sensitive.',
+        addedBy: req.user.id,
       },
       {
         name: 'Info-Article Style',
         thumbnailUrl: '',
         systemPrompt:
           'Create an educational blog post style page. Use an editorial layout with headings, reading-friendly spacing, and informative sections. Teach the reader, build credibility, and naturally transition to an affiliate recommendation with a compelling call-to-action.',
+        addedBy: req.user.id,
       },
     ];
 
