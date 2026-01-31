@@ -124,6 +124,8 @@ const worker = new Worker('deploy-queue', async (job) => {
     switch (platform) {
       case 'aws_s3':
       case 'digital_ocean':
+      case 'backblaze':
+      case 'cloudflare_r2':
         result = await uploadToS3(htmlContent, subDomain, credential, campaign);
         break;
       case 'netlify':

@@ -17,7 +17,7 @@ const CampaignSchema = new mongoose.Schema({
   },
   platform: {
     type: String,
-    enum: ['aws_s3', 'digital_ocean', 'netlify'],
+    enum: ['aws_s3', 'digital_ocean', 'netlify', 'backblaze', 'cloudflare_r2'],
     required: true,
   },
   credentialId: {

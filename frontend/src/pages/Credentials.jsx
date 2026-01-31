@@ -9,6 +9,8 @@ const initialFormState = {
   accessKey: '',
   secretKey: '',
   region: '',
+  accountId: '',
+  cdnUrl: '',
   netlifyAccessToken: '',
   siteId: '',
 };
@@ -17,7 +19,7 @@ const Credentials = () => {
   const [formData, setFormData] = useState(initialFormState);
   const [credentials, setCredentials] = useState([]);
 
-  const { name, platform, accessKey, secretKey, region, netlifyAccessToken, siteId } = formData;
+  const { name, platform, accessKey, secretKey, region, accountId, cdnUrl, netlifyAccessToken, siteId } = formData;
 
   useEffect(() => {
     const fetchCredentials = async () => {
@@ -49,12 +51,22 @@ const Credentials = () => {
   };
 
   const renderPlatformFields = () => {
-    if (platform === 'aws_s3' || platform === 'digital_ocean') {
+    if (platform === 'aws_s3' || platform === 'digital_ocean' || platform === 'backblaze') {
+      return (
+        <>
+          <Input type="text" placeholder={platform === 'backblaze' ? "Key ID (Access Key)" : "Access Key"} name="accessKey" value={accessKey} onChange={onChange} required />
+          <Input type="password" placeholder={platform === 'backblaze' ? "Application Key (Secret Key)" : "Secret Key"} name="secretKey" value={secretKey} onChange={onChange} required />
+          <Input type="text" placeholder="Region (e.g. us-east-1 or us-west-004)" name="region" value={region} onChange={onChange} required />
+        </>
+      );
+    }
+    if (platform === 'cloudflare_r2') {
       return (
         <>
           <Input type="text" placeholder="Access Key" name="accessKey" value={accessKey} onChange={onChange} required />
           <Input type="password" placeholder="Secret Key" name="secretKey" value={secretKey} onChange={onChange} required />
-          <Input type="text" placeholder="Region" name="region" value={region} onChange={onChange} required />
+          <Input type="text" placeholder="Account ID" name="accountId" value={accountId} onChange={onChange} required />
+          <Input type="text" placeholder="CDN/Public URL (e.g. https://pub-xxx.r2.dev)" name="cdnUrl" value={cdnUrl} onChange={onChange} />
         </>
       );
     }
@@ -80,6 +92,8 @@ const Credentials = () => {
             <select name="platform" value={platform} onChange={onChange} className="w-full p-3 mb-4 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
               <option value="aws_s3">AWS S3</option>
               <option value="digital_ocean">DigitalOcean Spaces</option>
+              <option value="backblaze">Backblaze B2</option>
+              <option value="cloudflare_r2">Cloudflare R2</option>
               <option value="netlify">Netlify</option>
             </select>
             {renderPlatformFields()}

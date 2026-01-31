@@ -153,7 +153,7 @@ const CreateCampaign = () => {
   }, [credentialId]);
 
   const fetchBuckets = useCallback(async (credId) => {
-    if (!credId || (platform !== 'aws_s3' && platform !== 'digital_ocean')) return;
+    if (!credId || !['aws_s3', 'digital_ocean', 'backblaze', 'cloudflare_r2'].includes(platform)) return;
     setLoadingBuckets(true);
     setSubmitError('');
     try {
@@ -192,7 +192,7 @@ const CreateCampaign = () => {
   }, []);
 
   useEffect(() => {
-    if (credentialId && (platform === 'aws_s3' || platform === 'digital_ocean')) {
+    if (credentialId && ['aws_s3', 'digital_ocean', 'backblaze', 'cloudflare_r2'].includes(platform)) {
       fetchBuckets(credentialId);
     }
   }, [credentialId, platform, fetchBuckets]);
@@ -483,11 +483,13 @@ const CreateCampaign = () => {
                 >
                   <option value="aws_s3">AWS S3</option>
                   <option value="digital_ocean">DigitalOcean</option>
+                  <option value="backblaze">Backblaze B2</option>
+                  <option value="cloudflare_r2">Cloudflare R2</option>
                   <option value="netlify">Netlify</option>
                 </select>
               </div>
 
-              {(platform === 'aws_s3' || platform === 'digital_ocean') && (
+              {['aws_s3', 'digital_ocean', 'backblaze', 'cloudflare_r2'].includes(platform) && (
                 <>
                   <div>
                     <label className="block text-white/80 mb-2">Bucket Name</label>

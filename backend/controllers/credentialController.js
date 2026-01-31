@@ -75,8 +75,8 @@ const getBuckets = async (req, res) => {
       return res.status(401).json({ msg: 'Not authorized' });
     }
 
-    if (!['aws_s3', 'digital_ocean'].includes(credentialDoc.platform)) {
-      return res.status(400).json({ msg: 'Bucket listing only supported for AWS S3 and DigitalOcean' });
+    if (!['aws_s3', 'digital_ocean', 'backblaze', 'cloudflare_r2'].includes(credentialDoc.platform)) {
+      return res.status(400).json({ msg: 'Bucket listing only supported for S3-compatible platforms' });
     }
 
     const credential = credentialDoc.getDecrypted();
@@ -84,6 +84,7 @@ const getBuckets = async (req, res) => {
       id: credentialDoc._id,
       platform: credentialDoc.platform,
       region: credential.region,
+      accountId: credential.accountId,
       hasAccessKey: !!credential.accessKey,
       hasSecretKey: !!credential.secretKey
     });
@@ -126,8 +127,8 @@ const getFolders = async (req, res) => {
       return res.status(401).json({ msg: 'Not authorized' });
     }
 
-    if (!['aws_s3', 'digital_ocean'].includes(credentialDoc.platform)) {
-      return res.status(400).json({ msg: 'Folder listing only supported for AWS S3 and DigitalOcean' });
+    if (!['aws_s3', 'digital_ocean', 'backblaze', 'cloudflare_r2'].includes(credentialDoc.platform)) {
+      return res.status(400).json({ msg: 'Folder listing only supported for S3-compatible platforms' });
     }
 
     if (!bucketName) {
@@ -139,6 +140,7 @@ const getFolders = async (req, res) => {
       id: credentialDoc._id,
       platform: credentialDoc.platform,
       region: credential.region,
+      accountId: credential.accountId,
       hasAccessKey: !!credential.accessKey,
       hasSecretKey: !!credential.secretKey,
       bucketName,

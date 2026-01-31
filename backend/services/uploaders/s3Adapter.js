@@ -1,38 +1,45 @@
 const { S3Client, PutObjectCommand, ListBucketsCommand, ListObjectsV2Command } = require('@aws-sdk/client-s3');
 
 const getS3Client = (credentials) => {
-  const { platform, region, accessKey, secretKey } = credentials;
+  const { platform, region, accessKey, secretKey, accountId } = credentials;
   
   console.log(`[DEBUG] Initializing S3Client for ${platform}. Region: ${region}, AccessKey length: ${accessKey?.length}`);
 
-  if (!region) {
-    throw new Error(`Region is required for ${platform === 'digital_ocean' ? 'DigitalOcean' : 'AWS S3'}`);
-  }
-
-  if (!accessKey || !secretKey) {
-    throw new Error(`Access Key and Secret Key are required for ${platform === 'digital_ocean' ? 'DigitalOcean' : 'AWS S3'}. Please check if the credentials were saved correctly.`);
-  }
-
   let s3Options = {
-    region,
+    region: platform === 'cloudflare_r2' ? 'auto' : region,
     credentials: {
       accessKeyId: accessKey,
       secretAccessKey: secretKey,
     },
-    // Add forcePathStyle for DigitalOcean or if needed for certain S3 regions
-    forcePathStyle: platform === 'digital_ocean' ? true : false,
+    // forcePathStyle: true is often needed for S3-compatible providers
+    forcePathStyle: platform !== 'aws_s3',
   };
 
+  if (!s3Options.region && platform !== 'cloudflare_r2') {
+    throw new Error(`Region is required for ${platform}`);
+  }
+
+  if (!accessKey || !secretKey) {
+    throw new Error(`Access Key and Secret Key are required for ${platform}. Please check if the credentials were saved correctly.`);
+  }
+
+  // Set endpoints for different platforms
   if (platform === 'digital_ocean') {
-    // DigitalOcean endpoint format: https://${region}.digitaloceanspaces.com
     s3Options.endpoint = `https://${region}.digitaloceanspaces.com`;
+  } else if (platform === 'backblaze') {
+    s3Options.endpoint = `https://s3.${region}.backblazeb2.com`;
+  } else if (platform === 'cloudflare_r2') {
+    if (!accountId) {
+      throw new Error('Account ID is required for Cloudflare R2');
+    }
+    s3Options.endpoint = `https://${accountId}.r2.cloudflarestorage.com`;
   }
 
   return new S3Client(s3Options);
 };
 
 const uploadToS3 = async (fileContent, subDomain, credentials, campaign) => {
-  const { platform, region } = credentials;
+  const { platform, region, cdnUrl } = credentials;
   const { bucketName, rootFolder } = campaign;
 
   const s3Client = getS3Client(credentials);
@@ -41,13 +48,13 @@ const uploadToS3 = async (fileContent, subDomain, credentials, campaign) => {
     Bucket: bucketName,
     Key: rootFolder ? `${rootFolder}/${subDomain}/index.html` : `${subDomain}/index.html`,
     Body: fileContent,
-    ACL: 'public-read', // Make the file publicly accessible
+    ACL: 'public-read', // Note: R2/B2 might handle ACLs differently, but PutObjectCommand supports it
     ContentType: 'text/html',
   };
 
   try {
     const data = await s3Client.send(new PutObjectCommand(params));
-    console.log('Successfully uploaded to S3/DO:', data);
+    console.log(`Successfully uploaded to ${platform}:`, data);
 
     // Construct the URL of the uploaded file
     let url;
@@ -55,13 +62,22 @@ const uploadToS3 = async (fileContent, subDomain, credentials, campaign) => {
 
     if (platform === 'digital_ocean') {
       url = `https://${bucketName}.${region}.digitaloceanspaces.com/${keyPath}`;
+    } else if (platform === 'backblaze') {
+      url = `https://${bucketName}.s3.${region}.backblazeb2.com/${keyPath}`;
+    } else if (platform === 'cloudflare_r2') {
+      if (cdnUrl) {
+        url = `${cdnUrl.replace(/\/$/, '')}/${keyPath}`;
+      } else {
+        console.warn('[WARN] No cdnUrl provided for Cloudflare R2. URL might not be public.');
+        url = `https://${bucketName}.${credentials.accountId}.r2.cloudflarestorage.com/${keyPath}`;
+      }
     } else { // AWS S3
       url = `https://${bucketName}.s3.${region}.amazonaws.com/${keyPath}`;
     }
     return { success: true, url };
 
   } catch (err) {
-    console.error('Error uploading to S3/DO:', err);
+    console.error(`Error uploading to ${platform}:`, err);
     return { success: false, error: err.message };
   }
 };
