@@ -86,6 +86,8 @@ const worker = new Worker('deploy-queue', async (job) => {
     userId: campaign.userId,
     campaignId,
     productName: row.name || row.product_name || row.productName || row.main_product || 'Unnamed Product',
+    subdomain: subDomain,
+    platform: platform,
     status: 'Pending',
   });
 

@@ -15,6 +15,14 @@ const WebsiteSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  subdomain: { 
+    type: String, 
+    default: '' 
+  },
+  platform: { 
+    type: String, 
+    required: true 
+  },
   url: {
     type: String,
     default: '',

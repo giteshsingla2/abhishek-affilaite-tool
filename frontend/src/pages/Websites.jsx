@@ -87,10 +87,12 @@ const Websites = () => {
   }, []);
 
   useEffect(() => {
-    const filtered = websites.filter(website =>
-      website.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      website.subdomain?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const lowerTerm = searchTerm.toLowerCase();
+    const filtered = websites.filter(website => {
+      const nameMatch = website.productName?.toLowerCase().includes(lowerTerm);
+      const domainMatch = website.subdomain?.toLowerCase().includes(lowerTerm);
+      return nameMatch || domainMatch;
+    });
     setFilteredWebsites(filtered);
   }, [searchTerm, websites]);
 
@@ -99,7 +101,7 @@ const Websites = () => {
       const token = localStorage.getItem('token');
       const response = await fetch('/api/websites', {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'x-auth-token': token
         }
       });
       
