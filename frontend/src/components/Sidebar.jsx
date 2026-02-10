@@ -1,11 +1,12 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, PlusCircle, Globe, KeyRound, FileText, Users } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, Globe, KeyRound, FileText, Users, Globe2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 const baseNavItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/websites', label: 'My Websites', icon: Globe },
+  { href: '/domains', label: 'Custom Domains', icon: Globe2 },
   { href: '/credentials', label: 'Credentials', icon: KeyRound },
 ];
 

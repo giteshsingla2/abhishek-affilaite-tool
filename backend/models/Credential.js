@@ -13,7 +13,7 @@ const CredentialSchema = new mongoose.Schema({
   },
   platform: {
     type: String,
-    enum: ['aws_s3', 'digital_ocean', 'netlify', 'backblaze', 'cloudflare_r2'],
+    enum: ['aws_s3', 'digital_ocean', 'netlify', 'backblaze', 'cloudflare_r2', 'custom_domain'],
     required: true,
   },
   // AWS S3 / DigitalOcean Spaces / Backblaze B2 / Cloudflare R2

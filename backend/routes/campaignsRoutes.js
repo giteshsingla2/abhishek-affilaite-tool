@@ -21,15 +21,19 @@ router.post('/start', auth, async (req, res) => {
     return res.status(400).json({ msg: 'templateId is required' });
   }
 
-  if (!platformConfig || !platformConfig.platform || !platformConfig.credentialId) {
-    return res.status(400).json({ msg: 'platformConfig.platform and platformConfig.credentialId are required' });
+  if (!platformConfig || !platformConfig.platform) {
+    return res.status(400).json({ msg: 'platformConfig.platform is required' });
+  }
+
+  if (platformConfig.platform !== 'custom_domain' && !platformConfig.credentialId) {
+    return res.status(400).json({ msg: 'platformConfig.credentialId is required for this platform' });
   }
 
   if (!Array.isArray(csvData) || csvData.length === 0) {
     return res.status(400).json({ msg: 'csvData must be a non-empty array' });
   }
 
-  const { platform, credentialId, bucketName, rootFolder } = platformConfig;
+  const { platform, credentialId, bucketName, rootFolder, domainName } = platformConfig;
 
   try {
     // 1. Fetch Template to ensure it exists
@@ -38,18 +42,28 @@ router.post('/start', auth, async (req, res) => {
       return res.status(404).json({ msg: 'Template not found' });
     }
 
-    // 2. Fetch & Validate Credential
-    const credential = await Credential.findById(credentialId);
-    if (!credential) {
-      return res.status(404).json({ msg: 'Credential not found' });
-    }
+    // 2. Fetch & Validate Credential (only if not custom_domain)
+    let credential = null;
+    if (platform !== 'custom_domain') {
+      if (!credentialId) {
+        return res.status(400).json({ msg: 'credentialId is required for this platform' });
+      }
+      credential = await Credential.findById(credentialId);
+      if (!credential) {
+        return res.status(404).json({ msg: 'Credential not found' });
+      }
 
-    if (credential.userId.toString() !== req.user.id) {
-      return res.status(403).json({ msg: 'Not authorized to use this credential' });
-    }
+      if (credential.userId.toString() !== req.user.id) {
+        return res.status(403).json({ msg: 'Not authorized to use this credential' });
+      }
 
-    if (credential.platform !== platform) {
-      return res.status(400).json({ msg: 'Selected credential platform does not match selected platform' });
+      if (credential.platform !== platform) {
+        return res.status(400).json({ msg: 'Selected credential platform does not match selected platform' });
+      }
+    } else {
+      if (!domainName) {
+        return res.status(400).json({ msg: 'domainName is required for custom_domain platform' });
+      }
     }
 
     // 3. Create Campaign Record
@@ -58,7 +72,8 @@ router.post('/start', auth, async (req, res) => {
       name: String(campaignName).trim(),
       status: 'processing',
       platform,
-      credentialId,
+      credentialId: platform === 'custom_domain' ? null : credentialId,
+      domainName: platform === 'custom_domain' ? domainName : undefined,
       templateId,
       bucketName,
       rootFolder,
@@ -91,7 +106,8 @@ router.post('/start', auth, async (req, res) => {
       await deployQueue.add('deploy-job', {
         campaignId: campaign._id,
         platform,
-        credentialId,
+        credentialId: platform === 'custom_domain' ? null : credentialId,
+        domainName: platform === 'custom_domain' ? domainName : undefined,
         templateId,
         row: row, // Pass the RAW row so custom headers work
         bucketName, // Pass dynamic bucket info

@@ -17,14 +17,15 @@ const CampaignSchema = new mongoose.Schema({
   },
   platform: {
     type: String,
-    enum: ['aws_s3', 'digital_ocean', 'netlify', 'backblaze', 'cloudflare_r2'],
+    enum: ['aws_s3', 'digital_ocean', 'netlify', 'backblaze', 'cloudflare_r2', 'custom_domain'],
     required: true,
   },
   credentialId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Credential',
-    required: true,
+    required: function() { return this.platform !== 'custom_domain'; },
   },
+  domainName: { type: String },
   templateId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Template',

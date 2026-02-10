@@ -23,6 +23,9 @@ const CreateCampaign = () => {
   const [credentials, setCredentials] = useState([]);
   const [credentialId, setCredentialId] = useState('');
   const [loadingCredentials, setLoadingCredentials] = useState(false);
+  const [domains, setDomains] = useState([]);
+  const [domainId, setDomainId] = useState('');
+  const [loadingDomains, setLoadingDomains] = useState(false);
   const [campaignName, setCampaignName] = useState('');
   const [bucketName, setBucketName] = useState('');
   const [rootFolder, setRootFolder] = useState('');
@@ -152,6 +155,25 @@ const CreateCampaign = () => {
     }
   }, [credentialId]);
 
+  const fetchDomains = useCallback(async () => {
+    setLoadingDomains(true);
+    setSubmitError('');
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.get('/api/domains', {
+        headers: { 'x-auth-token': token },
+      });
+      setDomains(res.data || []);
+      if (res.data && res.data.length > 0) {
+        setDomainId(res.data[0]._id);
+      }
+    } catch (err) {
+      setSubmitError(err?.response?.data?.msg || 'Failed to load domains');
+    } finally {
+      setLoadingDomains(false);
+    }
+  }, []);
+
   const fetchBuckets = useCallback(async (credId) => {
     if (!credId || !['aws_s3', 'digital_ocean', 'backblaze', 'cloudflare_r2'].includes(platform)) return;
     setLoadingBuckets(true);
@@ -228,7 +250,11 @@ const CreateCampaign = () => {
         return;
     }
     setParseError('');
-    await fetchCredentials(platform);
+    if (platform === 'custom_domain') {
+      await fetchDomains();
+    } else {
+      await fetchCredentials(platform);
+    }
     setStep(3);
   };
 
@@ -239,30 +265,26 @@ const CreateCampaign = () => {
 
     try {
       const token = localStorage.getItem('token');
-      console.log('[DEBUG] Submitting campaign with payload:', {
+      const selectedDomain = domains.find(d => d._id === domainId);
+      
+      const payload = {
         campaignName,
         templateId: selectedTemplate?._id,
         platformConfig: {
           platform,
-          credentialId,
+          credentialId: platform === 'custom_domain' ? undefined : credentialId,
+          domainId: platform === 'custom_domain' ? domainId : undefined,
+          domainName: platform === 'custom_domain' ? selectedDomain?.domain : undefined,
           bucketName,
           rootFolder,
         },
         csvData,
-      });
+      };
+
+      console.log('[DEBUG] Submitting campaign with payload:', payload);
       const res = await axios.post(
         '/api/campaigns/start',
-        {
-          campaignName,
-          templateId: selectedTemplate?._id,
-          platformConfig: {
-            platform,
-            credentialId,
-            bucketName,
-            rootFolder,
-          },
-          csvData,
-        },
+        payload,
         {
           headers: {
             'Content-Type': 'application/json',
@@ -477,7 +499,11 @@ const CreateCampaign = () => {
                   onChange={async (e) => {
                     const nextPlatform = e.target.value;
                     setPlatform(nextPlatform);
-                    await fetchCredentials(nextPlatform);
+                    if (nextPlatform === 'custom_domain') {
+                      await fetchDomains();
+                    } else {
+                      await fetchCredentials(nextPlatform);
+                    }
                   }}
                   className="w-full p-3 mb-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
@@ -486,132 +512,170 @@ const CreateCampaign = () => {
                   <option value="backblaze">Backblaze B2</option>
                   <option value="cloudflare_r2">Cloudflare R2</option>
                   <option value="netlify">Netlify</option>
+                  <option value="custom_domain">Custom Domain</option>
                 </select>
               </div>
 
-              {['aws_s3', 'digital_ocean', 'backblaze', 'cloudflare_r2'].includes(platform) && (
-                <>
-                  <div>
-                    <label className="block text-white/80 mb-2">Bucket Name</label>
-                    <div className="flex gap-2">
-                      <select
-                        className="w-full p-3 mb-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        value={bucketName}
-                        onChange={(e) => setBucketName(e.target.value)}
-                        required
-                      >
-                        <option value="">Select a bucket</option>
-                        {buckets.map((b) => (
-                          <option key={b} value={b}>{b}</option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        onClick={() => fetchBuckets(credentialId)}
-                        disabled={loadingBuckets || !credentialId}
-                        className="p-3 mb-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/10"
-                        title="Refresh Buckets"
-                      >
-                        {loadingBuckets ? '...' : '↻'}
-                      </button>
-                    </div>
+              {platform === 'custom_domain' ? (
+                <div className="md:col-span-2">
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <label className="block text-white/80">Select Domain</label>
+                    <button
+                      type="button"
+                      onClick={fetchDomains}
+                      disabled={loadingDomains}
+                      className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/10"
+                    >
+                      {loadingDomains ? 'Loading...' : 'Refresh'}
+                    </button>
                   </div>
-                  <div>
-                    <label className="block text-white/80 mb-2">Root Folder (Optional)</label>
-                    <div className="space-y-2">
-                      <div className="flex gap-2">
-                        {!isCreatingNewFolder ? (
+                  <select
+                    value={domainId}
+                    onChange={(e) => setDomainId(e.target.value)}
+                    className="w-full p-3 mt-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="" disabled>
+                      Select a domain
+                    </option>
+                    {domains.map((d) => (
+                      <option key={d._id} value={d._id}>
+                        {d.domain} {d.verified ? '(Verified)' : '(Unverified)'}
+                      </option>
+                    ))}
+                  </select>
+                  {domains.length === 0 && !loadingDomains && (
+                    <p className="mt-2 text-sm text-yellow-300">
+                      No domains found. Please add a domain in the Custom Domains page first.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <>
+                  {['aws_s3', 'digital_ocean', 'backblaze', 'cloudflare_r2'].includes(platform) && (
+                    <>
+                      <div>
+                        <label className="block text-white/80 mb-2">Bucket Name</label>
+                        <div className="flex gap-2">
                           <select
-                            className="w-full p-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                            value={rootFolder}
-                            onChange={(e) => {
-                              if (e.target.value === '___NEW___') {
-                                setIsCreatingNewFolder(true);
-                                setRootFolder('');
-                              } else {
-                                setRootFolder(e.target.value);
-                              }
-                            }}
+                            className="w-full p-3 mb-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            value={bucketName}
+                            onChange={(e) => setBucketName(e.target.value)}
+                            required
                           >
-                            <option value="">(Root)</option>
-                            {folders.map((f) => (
-                              <option key={f} value={f}>{f}</option>
+                            <option value="">Select a bucket</option>
+                            {buckets.map((b) => (
+                              <option key={b} value={b}>{b}</option>
                             ))}
-                            <option value="___NEW___">+ Create New Folder</option>
                           </select>
-                        ) : (
-                          <div className="relative w-full">
-                            <input
-                              className="w-full p-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                              value={rootFolder}
-                              onChange={(e) => setRootFolder(e.target.value)}
-                              placeholder="Type new folder name..."
-                              autoFocus
-                            />
+                          <button
+                            type="button"
+                            onClick={() => fetchBuckets(credentialId)}
+                            disabled={loadingBuckets || !credentialId}
+                            className="p-3 mb-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/10"
+                            title="Refresh Buckets"
+                          >
+                            {loadingBuckets ? '...' : '↻'}
+                          </button>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-white/80 mb-2">Root Folder (Optional)</label>
+                        <div className="space-y-2">
+                          <div className="flex gap-2">
+                            {!isCreatingNewFolder ? (
+                              <select
+                                className="w-full p-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                value={rootFolder}
+                                onChange={(e) => {
+                                  if (e.target.value === '___NEW___') {
+                                    setIsCreatingNewFolder(true);
+                                    setRootFolder('');
+                                  } else {
+                                    setRootFolder(e.target.value);
+                                  }
+                                }}
+                              >
+                                <option value="">(Root)</option>
+                                {folders.map((f) => (
+                                  <option key={f} value={f}>{f}</option>
+                                ))}
+                                <option value="___NEW___">+ Create New Folder</option>
+                              </select>
+                            ) : (
+                              <div className="relative w-full">
+                                <input
+                                  className="w-full p-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                  value={rootFolder}
+                                  onChange={(e) => setRootFolder(e.target.value)}
+                                  placeholder="Type new folder name..."
+                                  autoFocus
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setIsCreatingNewFolder(false);
+                                    setRootFolder('');
+                                  }}
+                                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 hover:text-white"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            )}
                             <button
                               type="button"
-                              onClick={() => {
-                                setIsCreatingNewFolder(false);
-                                setRootFolder('');
-                              }}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 hover:text-white"
+                              onClick={() => fetchFolders(credentialId, bucketName)}
+                              disabled={loadingFolders || !bucketName}
+                              className="p-3 rounded-lg bg-white/10 hover:bg-white/20 border border-white/10"
+                              title="Refresh Folders"
                             >
-                              ✕
+                              {loadingFolders ? '...' : '↻'}
                             </button>
                           </div>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => fetchFolders(credentialId, bucketName)}
-                          disabled={loadingFolders || !bucketName}
-                          className="p-3 rounded-lg bg-white/10 hover:bg-white/20 border border-white/10"
-                          title="Refresh Folders"
-                        >
-                          {loadingFolders ? '...' : '↻'}
-                        </button>
+                          {isCreatingNewFolder && (
+                            <p className="text-xs text-purple-300">Enter a name for the new folder. It will be created upon deployment.</p>
+                          )}
+                        </div>
                       </div>
-                      {isCreatingNewFolder && (
-                        <p className="text-xs text-purple-300">Enter a name for the new folder. It will be created upon deployment.</p>
-                      )}
+                    </>
+                  )}
+
+                  <div className="md:col-span-2">
+                    <div className="flex items-center justify-between gap-4 flex-wrap">
+                      <label className="block text-white/80">Saved Credential</label>
+                      <button
+                        type="button"
+                        onClick={() => fetchCredentials(platform)}
+                        disabled={loadingCredentials}
+                        className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/10"
+                      >
+                        {loadingCredentials ? 'Loading...' : 'Refresh'}
+                      </button>
                     </div>
+                    <select
+                      value={credentialId}
+                      onChange={(e) => setCredentialId(e.target.value)}
+                      className="w-full p-3 mt-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    >
+                      <option value="" disabled>
+                        Select a credential
+                      </option>
+                      {credentials.map((c) => (
+                        <option key={c._id} value={c._id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </>
               )}
-
-              <div className="md:col-span-2">
-                <div className="flex items-center justify-between gap-4 flex-wrap">
-                  <label className="block text-white/80">Saved Credential</label>
-                  <button
-                    type="button"
-                    onClick={() => fetchCredentials(platform)}
-                    disabled={loadingCredentials}
-                    className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/10"
-                  >
-                    {loadingCredentials ? 'Loading...' : 'Refresh'}
-                  </button>
-                </div>
-                <select
-                  value={credentialId}
-                  onChange={(e) => setCredentialId(e.target.value)}
-                  className="w-full p-3 mt-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="" disabled>
-                    Select a credential
-                  </option>
-                  {credentials.map((c) => (
-                    <option key={c._id} value={c._id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
             </div>
 
             <div className="flex justify-end mt-6">
               <button
                 type="button"
                 onClick={submitCampaign}
-                disabled={submitting || !csvData.length || !selectedTemplate || !credentialId || !campaignName}
+                disabled={submitting || !csvData.length || !selectedTemplate || (platform !== 'custom_domain' && !credentialId) || (platform === 'custom_domain' && !domainId) || !campaignName}
                 className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 disabled:opacity-50"
               >
                 {submitting ? 'Submitting...' : 'Start Campaign'}

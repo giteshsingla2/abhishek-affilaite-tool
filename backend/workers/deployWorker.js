@@ -2,6 +2,7 @@ const { Worker, Queue } = require('bullmq');
 const axios = require('axios');
 const dotenv = require('dotenv');
 const path = require('path');
+const fs = require('fs');
 
 // Load environment variables from the root of the backend folder
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
@@ -11,6 +12,8 @@ const Campaign = require('../models/Campaign');
 const Website = require('../models/Website');
 const { uploadToS3 } = require('../services/uploaders/s3Adapter');
 const { uploadToNetlify } = require('../services/uploaders/netlifyAdapter');
+
+const USER_SITES_BASE_DIR = process.env.USER_SITES_BASE_DIR || '/var/www/user_sites';
 
 const connection = {
   host: process.env.REDIS_HOST || '127.0.0.1',
@@ -110,15 +113,18 @@ const worker = new Worker('deploy-queue', async (job) => {
         console.log(`[JOB_PROGRESS] ${job.id}: Step 2 - HTML content generated (length: ${htmlContent.length}).`);
 
     console.log(`[JOB_PROGRESS] ${job.id}: Step 3 - Fetching credentials...`);
-    // 3. Fetch credentials
-    const credentialDoc = await Credential.findById(credentialId);
-    if (!credentialDoc) {
-      throw new Error(`Credential with ID ${credentialId} not found.`);
+    // 3. Fetch credentials (only if not custom_domain)
+    let credential = null;
+    if (platform !== 'custom_domain') {
+      const credentialDoc = await Credential.findById(credentialId);
+      if (!credentialDoc) {
+        throw new Error(`Credential with ID ${credentialId} not found.`);
+      }
+      credential = credentialDoc.getDecrypted();
+      console.log(`[JOB_PROGRESS] ${job.id}: Step 3 - Credentials decrypted successfully.`);
+    } else {
+      console.log(`[JOB_PROGRESS] ${job.id}: Step 3 - Custom domain platform, skipping credentials.`);
     }
-    const credential = credentialDoc.getDecrypted();
-    console.log(`[JOB_PROGRESS] ${job.id}: Step 3 - Credentials decrypted successfully.`);
-
-        console.log(`[JOB_PROGRESS] ${job.id}: Step 3 - Credentials ${credentialId} fetched successfully.`);
 
     console.log(`[JOB_PROGRESS] ${job.id}: Step 4 - Uploading to ${platform}...`);
     // 4. Upload to the specified platform
@@ -132,6 +138,25 @@ const worker = new Worker('deploy-queue', async (job) => {
         break;
       case 'netlify':
         result = await uploadToNetlify(htmlContent, subDomain, credential);
+        break;
+      case 'custom_domain':
+        const { domainName } = job.data;
+        const sitePath = path.join(USER_SITES_BASE_DIR, domainName, subDomain);
+        
+        try {
+          fs.mkdirSync(sitePath, { recursive: true });
+          fs.writeFileSync(path.join(sitePath, 'index.html'), htmlContent);
+          result = {
+            success: true,
+            url: `http://${subDomain}.${domainName}`
+          };
+        } catch (fsErr) {
+          console.error(`[ERROR] File System Error in custom_domain deploy:`, fsErr);
+          result = {
+            success: false,
+            error: `Failed to create site directory or write file: ${fsErr.message}`
+          };
+        }
         break;
       default:
         throw new Error(`Unsupported platform: ${platform}`);
