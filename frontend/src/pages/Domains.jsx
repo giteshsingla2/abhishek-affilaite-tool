@@ -185,8 +185,8 @@ const Domains = () => {
               To use your custom domain, please add the following <strong>A Records</strong> in your domain's DNS settings:
             </p>
             <ul className="mt-2 space-y-1 text-sm text-gray-400">
-              <li>• Host: <strong>@</strong> points to <strong>[Your_Server_IP]</strong></li>
-              <li>• Host: <strong>*</strong> (wildcard) points to <strong>[Your_Server_IP]</strong></li>
+              <li>• Host: <strong>@</strong> points to <strong>165.22.216.97</strong></li>
+              <li>• Host: <strong>*</strong> (wildcard) points to <strong>165.22.216.97</strong></li>
             </ul>
           </div>
         </GlassCard>
