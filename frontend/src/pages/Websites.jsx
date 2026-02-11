@@ -242,7 +242,7 @@ const Websites = () => {
                           </motion.a>
                         )}
                         <motion.a
-                          href={`/websites/${website._id}/edit`}
+                          href={`/edit-website/${website._id}`}
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
                           className="p-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 

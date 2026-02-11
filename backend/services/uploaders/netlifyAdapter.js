@@ -2,34 +2,56 @@ const axios = require('axios');
 const AdmZip = require('adm-zip');
 
 /**
- * Uploads a single HTML file to Netlify as a new site.
+ * Uploads a single HTML file to Netlify as a new site or redeploys to an existing site.
  * @param {string} htmlContent - The raw HTML string.
  * @param {string} subDomain - The desired subdomain (optional).
  * @param {object} credential - The Netlify credentials.
+ * @param {string} existingSiteId - Optional existing site ID for redeployment.
  */
-const uploadToNetlify = async (htmlContent, subDomain, credential) => {
-  let siteId;
+const uploadToNetlify = async (htmlContent, subDomain, credential, existingSiteId = null) => {
+  let siteId = existingSiteId;
   let finalSubdomain = subDomain;
 
   try {
-    // Step 1: Create the site record
-    console.log(`[Netlify] Step 1: Creating site with name: ${finalSubdomain}`);
-    const createSiteResponse = await axios.post(
-      'https://api.netlify.com/api/v1/sites',
-      { name: finalSubdomain },
-      {
-        headers: {
-          'Authorization': `Bearer ${credential.netlifyAccessToken}`,
-          'Content-Type': 'application/json'
+    // Step 1: Create the site record (if not redeploying to existing site)
+    if (!siteId) {
+      console.log(`[Netlify] Step 1: Creating site with name: ${finalSubdomain}`);
+      const createSiteResponse = await axios.post(
+        'https://api.netlify.com/api/v1/sites',
+        { name: finalSubdomain },
+        {
+          headers: {
+            'Authorization': `Bearer ${credential.netlifyAccessToken}`,
+            'Content-Type': 'application/json'
+          }
         }
+      );
+      siteId = createSiteResponse.data.id;
+      finalSubdomain = createSiteResponse.data.name; // Use the name returned by Netlify
+      console.log(`[Netlify] Step 1: Site created successfully. Site ID: ${siteId}, Subdomain: ${finalSubdomain}`);
+    } else {
+      console.log(`[Netlify] Step 1: Using existing site ID: ${siteId}`);
+      // Get site details to confirm subdomain
+      try {
+        const siteResponse = await axios.get(
+          `https://api.netlify.com/api/v1/sites/${siteId}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${credential.netlifyAccessToken}`
+            }
+          }
+        );
+        finalSubdomain = siteResponse.data.name;
+        console.log(`[Netlify] Step 1: Found existing site. Site ID: ${siteId}, Subdomain: ${finalSubdomain}`);
+      } catch (siteError) {
+        console.error(`[Netlify] Error getting site details: ${siteError.message}`);
+        // Continue anyway, as we'll attempt to deploy with the provided siteId
       }
-    );
-    siteId = createSiteResponse.data.id;
-    finalSubdomain = createSiteResponse.data.name; // Use the name returned by Netlify
-    console.log(`[Netlify] Step 1: Site created successfully. Site ID: ${siteId}, Subdomain: ${finalSubdomain}`);
+    }
 
   } catch (error) {
-    if (error.response?.status === 422) {
+    // Only attempt retry if we're creating a new site (not redeploying)
+    if (!existingSiteId && error.response?.status === 422) {
       console.log(`[Netlify] Step 1: Subdomain '${finalSubdomain}' is taken. Trying with a random suffix.`);
       const randomSuffix = Math.floor(100 + Math.random() * 9000); // 3-4 random digits
       finalSubdomain = `${subDomain}-${randomSuffix}`;
@@ -55,7 +77,7 @@ const uploadToNetlify = async (htmlContent, subDomain, credential) => {
       }
     } else {
       console.error('Netlify Site Creation Error:', error.response?.data || error.message);
-      return { success: false, error: 'Failed to create Netlify site.' };
+      return { success: false, error: existingSiteId ? 'Failed to get existing Netlify site details.' : 'Failed to create Netlify site.' };
     }
   }
 
