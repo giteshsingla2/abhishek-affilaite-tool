@@ -107,4 +107,23 @@ const uploadToNetlify = async (htmlContent, subDomain, credential) => {
   }
 };
 
-module.exports = { uploadToNetlify };
+const deleteFromNetlify = async (siteId, token) => {
+  const API_URL = 'https://api.netlify.com/api/v1';
+  try {
+    // If we have a siteId, delete the specific site
+    if (siteId) {
+      await axios.delete(`${API_URL}/sites/${siteId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      console.log(`✅ Deleted Netlify site: ${siteId}`);
+    }
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to delete Netlify site:', error.response?.data || error.message);
+    // Don't throw error if site is already gone (404)
+    if (error.response?.status === 404) return true;
+    throw error;
+  }
+};
+
+module.exports = { uploadToNetlify, deleteFromNetlify };

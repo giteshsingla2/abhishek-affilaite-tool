@@ -1,4 +1,4 @@
-const { S3Client, PutObjectCommand, ListBucketsCommand, ListObjectsV2Command } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, ListBucketsCommand, ListObjectsV2Command, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 
 const getS3Client = (credentials) => {
   const { platform, region, accessKey, secretKey, accountId } = credentials;
@@ -108,4 +108,30 @@ const listFolders = async (credentials, bucketName, prefix = "") => {
   }
 };
 
-module.exports = { uploadToS3, listBuckets, listFolders };
+/**
+ * Deletes a file from S3-compatible storage
+ */
+const deleteFromS3 = async (subDomain, credentials, bucketName, rootFolder) => {
+  const { platform } = credentials;
+  const s3Client = getS3Client(credentials);
+
+  // Construct Key (Same logic as upload)
+  const folderPath = rootFolder ? `${rootFolder}/${subDomain}` : subDomain;
+  const key = `${folderPath}/index.html`;
+
+  // Delete
+  try {
+    const command = new DeleteObjectCommand({
+      Bucket: bucketName,
+      Key: key,
+    });
+    await s3Client.send(command);
+    console.log(`✅ Deleted from ${platform}: ${key}`);
+    return true;
+  } catch (error) {
+    console.error(`❌ Failed to delete from ${platform}:`, error);
+    throw error;
+  }
+};
+
+module.exports = { uploadToS3, listBuckets, listFolders, deleteFromS3 };

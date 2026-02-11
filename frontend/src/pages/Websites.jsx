@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Search, ExternalLink, Edit, Globe, Server } from 'lucide-react';
+import { Search, ExternalLink, Edit, Globe, Server, Trash2 } from 'lucide-react';
+import axios from 'axios';
 
 const GlassCard = ({ children, className = '' }) => (
   <motion.div
@@ -95,6 +96,30 @@ const Websites = () => {
     });
     setFilteredWebsites(filtered);
   }, [searchTerm, websites]);
+
+  const handleDelete = async (websiteId) => {
+    if (!window.confirm("Are you sure? This will delete the live website permanently.")) {
+      return;
+    }
+
+    try {
+      // Optimistic UI update
+      const originalWebsites = [...websites];
+      const originalFiltered = [...filteredWebsites];
+      
+      setWebsites(websites.filter(w => w._id !== websiteId));
+      setFilteredWebsites(filteredWebsites.filter(w => w._id !== websiteId));
+
+      const token = localStorage.getItem('token');
+      await axios.delete(`/api/websites/${websiteId}`, {
+        headers: { 'x-auth-token': token }
+      });
+    } catch (error) {
+      console.error("Delete failed", error);
+      alert("Failed to delete website from server.");
+      fetchWebsites(); // Re-fetch on failure
+    }
+  };
 
   const fetchWebsites = async () => {
     try {
@@ -226,6 +251,16 @@ const Websites = () => {
                         >
                           <Edit className="w-4 h-4" />
                         </motion.a>
+                        <motion.button
+                          onClick={() => handleDelete(website._id)}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="p-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 
+                                   rounded-lg transition-colors duration-200"
+                          title="Delete Website"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </motion.button>
                       </div>
                     </td>
                   </motion.tr>

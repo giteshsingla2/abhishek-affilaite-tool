@@ -40,6 +40,10 @@ const WebsiteSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  siteId: {
+    type: String,
+    default: '',
+  },
   createdAt: {
     type: Date,
     default: Date.now,

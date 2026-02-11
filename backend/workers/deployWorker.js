@@ -172,6 +172,9 @@ const worker = new Worker('deploy-queue', async (job) => {
     // 5. Update website document with final data
     website.status = 'Live';
     website.url = result.url;
+    if (result.siteId) {
+      website.siteId = result.siteId;
+    }
     website.htmlContent = htmlContent; // Save the final HTML content
     website.headerCode = String(row.header_code || '').trim(); // Save the header code from CSV
     await website.save();
