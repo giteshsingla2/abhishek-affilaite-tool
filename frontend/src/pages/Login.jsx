@@ -9,6 +9,7 @@ const Login = () => {
     email: '',
     password: '',
   });
+  const [error, setError] = useState('');
   const navigate = useNavigate();
 
   const { email, password } = formData;
@@ -31,7 +32,7 @@ const Login = () => {
         navigate('/dashboard');
       }
     } catch (err) {
-      console.error(err.response.data);
+      setError(err.response.data.msg);
     }
   };
 
@@ -39,6 +40,7 @@ const Login = () => {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-purple-900 text-white flex items-center justify-center p-4">
       <GlassCard className="p-8 w-full max-w-md">
         <h1 className="text-3xl font-bold mb-6 text-center">Login</h1>
+        {error && <p className="text-red-500 text-center mb-4">{error}</p>}
         <form onSubmit={onSubmit}>
           <Input
             type="email"
