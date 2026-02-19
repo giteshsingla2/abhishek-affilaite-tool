@@ -20,10 +20,6 @@ const domainSchema = new mongoose.Schema({
       message: props => `${props.value} is not a valid domain name!`
     }
   },
-  verified: {
-    type: Boolean,
-    default: false
-  },
   createdAt: {
     type: Date,
     default: Date.now

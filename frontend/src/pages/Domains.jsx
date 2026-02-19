@@ -69,7 +69,7 @@ const Domains = () => {
       if (response.ok) {
         setDomains([data, ...domains]);
         setNewDomain('');
-        setSuccess('Domain added successfully! Please follow the instructions below to verify.');
+        setSuccess('Domain added successfully!');
       } else {
         setError(data.msg || 'Failed to add domain');
       }
@@ -100,27 +100,6 @@ const Domains = () => {
     }
   };
 
-  const handleVerify = async (id) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/domains/${id}/verify`, {
-        method: 'PUT',
-        headers: {
-          'x-auth-token': token
-        }
-      });
-
-      const data = await response.json();
-      if (data.verified) {
-        setDomains(domains.map(d => d._id === id ? { ...d, verified: true } : d));
-        alert('Domain verified successfully!');
-      } else {
-        alert(data.msg || 'Verification failed. Please check your DNS settings.');
-      }
-    } catch (err) {
-      alert('Error during verification. Please try again later.');
-    }
-  };
 
   if (loading) {
     return (
@@ -200,34 +179,15 @@ const Domains = () => {
             domains.map((domain) => (
               <GlassCard key={domain._id} className="p-4 flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className={`p-2 rounded-full ${domain.verified ? 'bg-green-500/20' : 'bg-yellow-500/20'}`}>
-                    <Globe className={`w-5 h-5 ${domain.verified ? 'text-green-400' : 'text-yellow-400'}`} />
+                  <div className="p-2 rounded-full bg-cyan-500/20">
+                    <Globe className="w-5 h-5 text-cyan-400" />
                   </div>
                   <div>
                     <h3 className="text-white font-medium">{domain.domain}</h3>
-                    <div className="flex items-center gap-2 mt-1">
-                      {domain.verified ? (
-                        <span className="text-green-400 text-xs flex items-center gap-1">
-                          <CheckCircle className="w-3 h-3" /> Verified
-                        </span>
-                      ) : (
-                        <span className="text-yellow-400 text-xs flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3" /> Unverified
-                        </span>
-                      )}
-                    </div>
                   </div>
                 </div>
                 
                 <div className="flex items-center gap-2">
-                  {!domain.verified && (
-                    <button
-                      onClick={() => handleVerify(domain._id)}
-                      className="px-3 py-1 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
-                    >
-                      <RefreshCw className="w-3 h-3" /> Verify
-                    </button>
-                  )}
                   <button
                     onClick={() => handleDeleteDomain(domain._id)}
                     className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"

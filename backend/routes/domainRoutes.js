@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const dns = require('dns').promises;
 const auth = require('../middleware/authMiddleware');
 const Domain = require('../models/Domain');
 
@@ -74,41 +73,5 @@ router.delete('/:id', auth, async (req, res) => {
   }
 });
 
-// @route   PUT api/domains/:id/verify
-// @desc    Manually verify domain DNS
-// @access  Private
-router.put('/:id/verify', auth, async (req, res) => {
-  try {
-    const domainDoc = await Domain.findById(req.params.id);
-
-    if (!domainDoc) {
-      return res.status(404).json({ msg: 'Domain not found' });
-    }
-
-    if (domainDoc.userId.toString() !== req.user.id) {
-      return res.status(401).json({ msg: 'User not authorized' });
-    }
-
-    // Get server IP (assuming it's in env or we can use a placeholder)
-    const serverIp = process.env.SERVER_IP || '127.0.0.1'; 
-    
-    try {
-      const records = await dns.resolve4(domainDoc.domain);
-      if (records.includes(serverIp)) {
-        domainDoc.verified = true;
-        await domainDoc.save();
-        return res.json({ success: true, verified: true, msg: 'Domain verified successfully' });
-      } else {
-        return res.json({ success: false, verified: false, msg: `DNS record found but does not match server IP ${serverIp}` });
-      }
-    } catch (dnsErr) {
-      return res.status(400).json({ success: false, msg: 'Could not resolve domain. Please check your DNS settings.' });
-    }
-
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server Error');
-  }
-});
 
 module.exports = router;
