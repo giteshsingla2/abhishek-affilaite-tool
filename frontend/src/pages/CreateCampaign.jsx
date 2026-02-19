@@ -558,7 +558,7 @@ const CreateCampaign = () => {
                         </option>
                         {domains.map((d) => (
                           <option key={d._id} value={d._id}>
-                            {d.domain} {d.verified ? '(Verified)' : '(Unverified)'}
+                            {d.domain}
                           </option>
                         ))}
                       </select>
