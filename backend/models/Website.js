@@ -19,6 +19,10 @@ const WebsiteSchema = new mongoose.Schema({
     type: String, 
     default: '' 
   },
+  domain: {
+    type: String,
+    default: '',
+  },
   platform: { 
     type: String, 
     required: true 

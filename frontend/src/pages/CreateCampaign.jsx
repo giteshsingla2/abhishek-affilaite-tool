@@ -30,6 +30,7 @@ const CreateCampaign = () => {
   const [bucketName, setBucketName] = useState('');
   const [rootFolder, setRootFolder] = useState('');
   const [isCreatingNewFolder, setIsCreatingNewFolder] = useState(false);
+  const [useDynamicDomain, setUseDynamicDomain] = useState(false);
 
   // S3 Listing state
   const [buckets, setBuckets] = useState([]);
@@ -273,8 +274,9 @@ const CreateCampaign = () => {
         platformConfig: {
           platform,
           credentialId: platform === 'custom_domain' ? undefined : credentialId,
-          domainId: platform === 'custom_domain' ? domainId : undefined,
-          domainName: platform === 'custom_domain' ? selectedDomain?.domain : undefined,
+          domainId: platform === 'custom_domain' && !useDynamicDomain ? domainId : undefined,
+          domainName: platform === 'custom_domain' && !useDynamicDomain ? selectedDomain?.domain : undefined,
+          useDynamicDomain: platform === 'custom_domain' ? useDynamicDomain : undefined,
           bucketName,
           rootFolder,
         },
@@ -517,36 +519,55 @@ const CreateCampaign = () => {
               </div>
 
               {platform === 'custom_domain' ? (
-                <div className="md:col-span-2">
-                  <div className="flex items-center justify-between gap-4 flex-wrap">
-                    <label className="block text-white/80">Select Domain</label>
-                    <button
-                      type="button"
-                      onClick={fetchDomains}
-                      disabled={loadingDomains}
-                      className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/10"
-                    >
-                      {loadingDomains ? 'Loading...' : 'Refresh'}
-                    </button>
+                <div className="md:col-span-2 space-y-4">
+                  <div className="flex items-center gap-3 bg-white/5 p-3 rounded-lg">
+                    <input
+                      type="checkbox"
+                      id="useDynamicDomain"
+                      checked={useDynamicDomain}
+                      onChange={(e) => setUseDynamicDomain(e.target.checked)}
+                      className="h-5 w-5 rounded bg-white/10 border-white/20 text-purple-500 focus:ring-purple-500"
+                    />
+                    <label htmlFor="useDynamicDomain" className="text-white/90 cursor-pointer">Use Domains from CSV Column</label>
                   </div>
-                  <select
-                    value={domainId}
-                    onChange={(e) => setDomainId(e.target.value)}
-                    className="w-full p-3 mt-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  >
-                    <option value="" disabled>
-                      Select a domain
-                    </option>
-                    {domains.map((d) => (
-                      <option key={d._id} value={d._id}>
-                        {d.domain} {d.verified ? '(Verified)' : '(Unverified)'}
-                      </option>
-                    ))}
-                  </select>
-                  {domains.length === 0 && !loadingDomains && (
-                    <p className="mt-2 text-sm text-yellow-300">
-                      No domains found. Please add a domain in the Custom Domains page first.
-                    </p>
+
+                  {useDynamicDomain ? (
+                    <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3 text-sm text-purple-200">
+                      Ensure your CSV has a column named 'domain'. We will verify ownership of each domain before deployment.
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="flex items-center justify-between gap-4 flex-wrap">
+                        <label className="block text-white/80">Select Domain</label>
+                        <button
+                          type="button"
+                          onClick={fetchDomains}
+                          disabled={loadingDomains}
+                          className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/10"
+                        >
+                          {loadingDomains ? 'Loading...' : 'Refresh'}
+                        </button>
+                      </div>
+                      <select
+                        value={domainId}
+                        onChange={(e) => setDomainId(e.target.value)}
+                        className="w-full p-3 mt-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      >
+                        <option value="" disabled>
+                          Select a domain
+                        </option>
+                        {domains.map((d) => (
+                          <option key={d._id} value={d._id}>
+                            {d.domain} {d.verified ? '(Verified)' : '(Unverified)'}
+                          </option>
+                        ))}
+                      </select>
+                      {domains.length === 0 && !loadingDomains && (
+                        <p className="mt-2 text-sm text-yellow-300">
+                          No domains found. Please add a domain in the Custom Domains page first.
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
               ) : (
@@ -675,7 +696,7 @@ const CreateCampaign = () => {
               <button
                 type="button"
                 onClick={submitCampaign}
-                disabled={submitting || !csvData.length || !selectedTemplate || (platform !== 'custom_domain' && !credentialId) || (platform === 'custom_domain' && !domainId) || !campaignName}
+                disabled={submitting || !csvData.length || !selectedTemplate || (platform !== 'custom_domain' && !credentialId) || (platform === 'custom_domain' && !useDynamicDomain && !domainId) || !campaignName}
                 className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 disabled:opacity-50"
               >
                 {submitting ? 'Submitting...' : 'Start Campaign'}

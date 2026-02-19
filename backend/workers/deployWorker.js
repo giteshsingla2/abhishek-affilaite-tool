@@ -77,7 +77,7 @@ const generateHtml = async (systemPrompt, row) => {
 
 const worker = new Worker('deploy-queue', async (job) => {
   console.log(`[JOB_START] Job ${job.id} received with data:`, job.data);
-  const { platform, credentialId, templateId, row, campaignId } = job.data;
+  const { platform, credentialId, templateId, row, campaignId, domainName: dynamicDomain } = job.data;
   const subDomain = row?.sub_domain;
 
   const campaign = await Campaign.findById(campaignId);
@@ -85,11 +85,14 @@ const worker = new Worker('deploy-queue', async (job) => {
     throw new Error(`Campaign with ID ${campaignId} not found.`);
   }
 
+  const targetDomain = dynamicDomain || campaign.domainName;
+
   const website = await Website.create({
     userId: campaign.userId,
     campaignId,
     productName: row.name || row.product_name || row.productName || row.main_product || 'Unnamed Product',
     subdomain: subDomain,
+    domain: targetDomain, // Save the determined domain
     platform: platform,
     status: 'Pending',
   });
@@ -140,15 +143,14 @@ const worker = new Worker('deploy-queue', async (job) => {
         result = await uploadToNetlify(htmlContent, subDomain, credential);
         break;
       case 'custom_domain':
-        const { domainName } = job.data;
-        const sitePath = path.join(USER_SITES_BASE_DIR, domainName, subDomain);
+        const sitePath = path.join(USER_SITES_BASE_DIR, targetDomain, subDomain);
         
         try {
           fs.mkdirSync(sitePath, { recursive: true });
           fs.writeFileSync(path.join(sitePath, 'index.html'), htmlContent);
           result = {
             success: true,
-            url: `http://${subDomain}.${domainName}`
+            url: `http://${subDomain}.${targetDomain}`
           };
         } catch (fsErr) {
           console.error(`[ERROR] File System Error in custom_domain deploy:`, fsErr);

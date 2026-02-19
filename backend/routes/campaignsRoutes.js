@@ -5,6 +5,7 @@ const auth = require('../middleware/authMiddleware');
 const Campaign = require('../models/Campaign');
 const Credential = require('../models/Credential');
 const Template = require('../models/Template');
+const Domain = require('../models/Domain');
 const { deployQueue } = require('../workers/deployWorker');
 
 // @route   POST /api/campaigns/start
@@ -33,7 +34,7 @@ router.post('/start', auth, async (req, res) => {
     return res.status(400).json({ msg: 'csvData must be a non-empty array' });
   }
 
-  const { platform, credentialId, bucketName, rootFolder, domainName } = platformConfig;
+  const { platform, credentialId, bucketName, rootFolder, domainName, useDynamicDomain } = platformConfig;
 
   try {
     // 1. Fetch Template to ensure it exists
@@ -44,7 +45,21 @@ router.post('/start', auth, async (req, res) => {
 
     // 2. Fetch & Validate Credential (only if not custom_domain)
     let credential = null;
-    if (platform !== 'custom_domain') {
+    let allowedDomains = null;
+
+    if (platform === 'custom_domain' && useDynamicDomain) {
+      const csvDomains = [...new Set(csvData.map(row => row.domain).filter(Boolean))];
+      if (csvDomains.length === 0) {
+        return res.status(400).json({ msg: 'CSV file must contain a non-empty `domain` column for dynamic domain mode.' });
+      }
+
+      const userDomains = await Domain.find({ userId: req.user.id, name: { $in: csvDomains } });
+      allowedDomains = new Set(userDomains.map(d => d.name));
+
+      if (allowedDomains.size === 0) {
+        return res.status(403).json({ msg: 'None of the domains in the CSV are registered to your account.' });
+      }
+    } else if (platform !== 'custom_domain') {
       if (!credentialId) {
         return res.status(400).json({ msg: 'credentialId is required for this platform' });
       }
@@ -61,8 +76,8 @@ router.post('/start', auth, async (req, res) => {
         return res.status(400).json({ msg: 'Selected credential platform does not match selected platform' });
       }
     } else {
-      if (!domainName) {
-        return res.status(400).json({ msg: 'domainName is required for custom_domain platform' });
+      if (!useDynamicDomain && !domainName) {
+        return res.status(400).json({ msg: 'domainName is required for single domain mode' });
       }
     }
 
@@ -103,11 +118,18 @@ router.post('/start', auth, async (req, res) => {
         continue;
       }
 
+      if (useDynamicDomain && platform === 'custom_domain') {
+        if (!row.domain || !allowedDomains.has(row.domain)) {
+          console.log(`[CAMPAIGN_START] Skipping row ${i} - invalid or unowned domain: ${row.domain}`);
+          continue;
+        }
+      }
+
       await deployQueue.add('deploy-job', {
         campaignId: campaign._id,
         platform,
         credentialId: platform === 'custom_domain' ? null : credentialId,
-        domainName: platform === 'custom_domain' ? domainName : undefined,
+        domainName: useDynamicDomain ? row.domain : domainName,
         templateId,
         row: row, // Pass the RAW row so custom headers work
         bucketName, // Pass dynamic bucket info

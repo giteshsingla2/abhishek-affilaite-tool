@@ -28,7 +28,7 @@ const StatusBadge = ({ status }) => {
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [stats, setStats] = useState({ totalWebsitesLive: 0, totalDeployments: 0, storageUsed: '0%', creditsRemaining: '0' });
+  const [stats, setStats] = useState({ totalWebsitesLive: 0, totalDeployments: 0 });
   const [recentWebsites, setRecentWebsites] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -94,12 +94,6 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatsCard icon={Globe} label="Total Websites Live" value={stats.totalWebsitesLive} />
         <StatsCard icon={Rocket} label="Total Deployments" value={stats.totalDeployments} />
-        <StatsCard icon={Database} label="Storage Used" value={stats.storageUsed}>
-          <div className="w-full bg-slate-700 rounded-full h-2.5 mt-2">
-            <div className="bg-purple-600 h-2.5 rounded-full" style={{ width: stats.storageUsed }}></div>
-          </div>
-        </StatsCard>
-        <StatsCard icon={Zap} label="Credits Remaining" value={stats.creditsRemaining} className="text-yellow-300" />
       </div>
 
       <div className="mt-10">
