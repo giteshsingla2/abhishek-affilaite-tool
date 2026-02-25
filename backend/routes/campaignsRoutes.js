@@ -119,10 +119,12 @@ router.post('/start', auth, async (req, res) => {
       }
 
       if (useDynamicDomain && platform === 'custom_domain') {
-        if (!row.domain || !allowedDomains.has(row.domain)) {
+        const cleanDomain = String(row.domain || '').trim().toLowerCase();
+        if (!cleanDomain || !allowedDomains.has(cleanDomain)) {
           console.log(`[CAMPAIGN_START] Skipping row ${i} - invalid or unowned domain: ${row.domain}`);
           continue;
         }
+        row.domain = cleanDomain;
       }
 
       await deployQueue.add('deploy-job', {
