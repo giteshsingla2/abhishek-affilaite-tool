@@ -48,13 +48,13 @@ router.post('/start', auth, async (req, res) => {
     let allowedDomains = null;
 
     if (platform === 'custom_domain' && useDynamicDomain) {
-      const csvDomains = [...new Set(csvData.map(row => row.domain).filter(Boolean))];
+      const csvDomains = [...new Set(csvData.map(row => String(row.domain || '').trim().toLowerCase()).filter(Boolean))];
       if (csvDomains.length === 0) {
         return res.status(400).json({ msg: 'CSV file must contain a non-empty `domain` column for dynamic domain mode.' });
       }
 
       const userDomains = await Domain.find({ userId: req.user.id, domain: { $in: csvDomains } });
-      allowedDomains = new Set(userDomains.map(d => d.name));
+      allowedDomains = new Set(userDomains.map(d => d.domain));
 
       if (allowedDomains.size === 0) {
         return res.status(403).json({ msg: 'None of the domains in the CSV are registered to your account.' });
