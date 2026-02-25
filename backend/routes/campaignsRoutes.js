@@ -53,7 +53,7 @@ router.post('/start', auth, async (req, res) => {
         return res.status(400).json({ msg: 'CSV file must contain a non-empty `domain` column for dynamic domain mode.' });
       }
 
-      const userDomains = await Domain.find({ userId: req.user.id, name: { $in: csvDomains } });
+      const userDomains = await Domain.find({ userId: req.user.id, domain: { $in: csvDomains } });
       allowedDomains = new Set(userDomains.map(d => d.name));
 
       if (allowedDomains.size === 0) {
