@@ -12,7 +12,7 @@ const { deployQueue } = require('../workers/deployWorker');
 // @desc    Save campaign + enqueue one job per csv row (Dynamic Headers Support)
 // @access  Private
 router.post('/start', auth, async (req, res) => {
-  const { campaignName, templateId, platformConfig, csvData } = req.body;
+  const { campaignName, templateId, platformConfig, csvData, model } = req.body;
 
   if (!campaignName || String(campaignName).trim() === '') {
     return res.status(400).json({ msg: 'campaignName is required' });
@@ -135,7 +135,8 @@ router.post('/start', auth, async (req, res) => {
         templateId,
         row: row, // Pass the RAW row so custom headers work
         bucketName, // Pass dynamic bucket info
-        rootFolder
+        rootFolder,
+        model: model || process.env.OPENROUTER_MODEL,
       });
 
       queued++;

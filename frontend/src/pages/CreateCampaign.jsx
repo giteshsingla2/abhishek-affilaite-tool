@@ -5,6 +5,30 @@ import GlassCard from '../components/GlassCard';
 
 const MAX_PREVIEW_ROWS = 30;
 
+const AVAILABLE_MODELS = [
+  {
+    id: 'anthropic/claude-sonnet-4.6',
+    name: 'Claude Sonnet 4.6',
+    provider: 'Anthropic',
+    description: 'Best quality output. High Pricing.',
+    badge: 'Recommended',
+  },
+  {
+    id: 'google/gemini-2.5-flash',
+    name: 'Gemini 2.5 Flash',
+    provider: 'Google',
+    description: 'Fast and Medium Pricing.',
+    badge: 'Fast',
+  },
+  {
+    id: 'qwen/qwen3-coder-plus',
+    name: 'Qwen3 Coder Plus',
+    provider: 'Qwen',
+    description: 'Medium Quality and Medium Speed.',
+    badge: 'Balanced',
+  },
+];
+
 const CreateCampaign = () => {
   const [step, setStep] = useState(1);
 
@@ -12,6 +36,7 @@ const CreateCampaign = () => {
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [selectedModel, setSelectedModel] = useState(AVAILABLE_MODELS[0].id);
 
   // Step 2: CSV Upload
   const [csvData, setCsvData] = useState([]);
@@ -67,8 +92,8 @@ const CreateCampaign = () => {
     setCsvHeaders([]);
 
     if (!selectedTemplate) {
-        setParseError('Please select a template before uploading a file.');
-        return;
+      setParseError('Please select a template before uploading a file.');
+      return;
     }
 
     Papa.parse(file, {
@@ -141,7 +166,7 @@ const CreateCampaign = () => {
 
       const filtered = (res.data || []).filter((c) => c.platform === selectedPlatform);
       setCredentials(filtered);
-      
+
       // Clear buckets/folders when switching platforms or credentials
       setBuckets([]);
       setFolders([]);
@@ -225,7 +250,7 @@ const CreateCampaign = () => {
       fetchFolders(credentialId, bucketName);
     }
   }, [credentialId, bucketName, fetchFolders]);
-  
+
   useEffect(() => {
     if (step === 1) {
       fetchTemplates();
@@ -247,8 +272,8 @@ const CreateCampaign = () => {
       return;
     }
     if (invalidCount > 0) {
-        setParseError('Please fix the invalid rows before proceeding.');
-        return;
+      setParseError('Please fix the invalid rows before proceeding.');
+      return;
     }
     setParseError('');
     if (platform === 'custom_domain') {
@@ -267,10 +292,11 @@ const CreateCampaign = () => {
     try {
       const token = localStorage.getItem('token');
       const selectedDomain = domains.find(d => d._id === domainId);
-      
+
       const payload = {
         campaignName,
         templateId: selectedTemplate?._id,
+        model: selectedModel,
         platformConfig: {
           platform,
           credentialId: platform === 'custom_domain' ? undefined : credentialId,
@@ -384,6 +410,34 @@ const CreateCampaign = () => {
                 );
               })}
             </div>
+
+            {selectedTemplate && (
+              <div className="mt-8 animate-fade-in-up">
+                <h3 className="text-xl font-bold mb-4">Select AI Model</h3>
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {AVAILABLE_MODELS.map((model) => {
+                    const isSelected = selectedModel === model.id;
+                    return (
+                      <button
+                        type="button"
+                        key={model.id}
+                        onClick={() => setSelectedModel(model.id)}
+                        className={`text-left rounded-2xl border p-4 bg-white/5 hover:bg-white/10 transition flex flex-col h-full ${isSelected ? 'border-purple-500 ring-2 ring-purple-500 bg-purple-500/10' : 'border-white/10'}`}
+                      >
+                        <div className="flex justify-between items-start w-full mb-2">
+                          <div className="font-semibold text-white">{model.name}</div>
+                          {model.badge && (
+                            <span className="bg-purple-500/20 text-purple-300 text-[10px] uppercase font-bold px-2 py-1 rounded-full whitespace-nowrap ml-2">{model.badge}</span>
+                          )}
+                        </div>
+                        <div className="text-xs text-purple-300 mb-3">{model.provider}</div>
+                        <div className="text-sm text-white/70 mt-auto">{model.description}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <div className="flex justify-end mt-6">
               <button

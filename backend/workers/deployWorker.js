@@ -352,7 +352,7 @@ const stripMarkdownCodeFences = (text) => {
     .trim();
 };
 
-const generateHtml = async (systemPrompt, row) => {
+const generateHtml = async (systemPrompt, row, model) => {
   const systemRole = "You are a Helpful AI Assistant who creates HTML Websites. Return only a valid complete HTML document — no markdown, no code fences, no explanations, no commentary before or after the HTML.";
 
   // Generate fresh random Design DNA for every deployment
@@ -377,7 +377,7 @@ const generateHtml = async (systemPrompt, row) => {
 
   try {
     const response = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
-      model: process.env.OPENROUTER_MODEL,
+      model: model || process.env.OPENROUTER_MODEL,
       messages: [
         { role: 'system', content: systemRole },
         { role: 'user', content: fullPrompt },
@@ -407,7 +407,7 @@ const generateHtml = async (systemPrompt, row) => {
 
 const worker = new Worker('deploy-queue', async (job) => {
   console.log(`[JOB_START] Job ${job.id} received with data:`, job.data);
-  const { platform, credentialId, templateId, row, campaignId, domainName: dynamicDomain } = job.data;
+  const { platform, credentialId, templateId, row, campaignId, domainName: dynamicDomain, model } = job.data;
   const subDomain = row?.sub_domain;
 
   const campaign = await Campaign.findById(campaignId);
@@ -438,7 +438,7 @@ const worker = new Worker('deploy-queue', async (job) => {
     console.log(`[JOB_PROGRESS] ${job.id}: Step 1 - Template fetched successfully.`);
 
     console.log(`[JOB_PROGRESS] ${job.id}: Step 2 - Generating HTML with random Design DNA...`);
-    const htmlContent = await generateHtml(template.systemPrompt, row);
+    const htmlContent = await generateHtml(template.systemPrompt, row, model);
     console.log(`[JOB_PROGRESS] ${job.id}: Step 2 - HTML generated (length: ${htmlContent.length}).`);
 
     console.log(`[JOB_PROGRESS] ${job.id}: Step 3 - Fetching credentials...`);
