@@ -26,265 +26,119 @@ const deployQueue = new Queue('deploy-queue', { connection });
 // DESIGN DNA ENGINE
 // ============================================================
 
+const COLOR_PALETTES = [
+  {
+    name: 'Royal Blue',
+    vars: `--primary:#1a3a7a;--primary-dark:#0f2456;--primary-light:#e8eef8;--accent:#f59e0b;--accent-dark:#d97706;--text-dark:#1a1a2e;--text-mid:#374151;--text-light:#6b7280;--white:#ffffff;--bg-light:#f8fafF;--bg-gray:#f3f4f6;--border:#e5e7eb;--shadow:0 4px 24px rgba(26,58,122,0.10);--shadow-lg:0 8px 40px rgba(26,58,122,0.15);`
+  },
+  {
+    name: 'Deep Burgundy',
+    vars: `--primary:#7a1a2e;--primary-dark:#5e1222;--primary-light:#f8eaed;--accent:#f59e0b;--accent-dark:#d97706;--text-dark:#1a1a2e;--text-mid:#374151;--text-light:#6b7280;--white:#ffffff;--bg-light:#fdf8f9;--bg-gray:#f3f4f6;--border:#e5e7eb;--shadow:0 4px 24px rgba(122,26,46,0.10);--shadow-lg:0 8px 40px rgba(122,26,46,0.15);`
+  },
+  {
+    name: 'Ocean Teal',
+    vars: `--primary:#1a6b7a;--primary-dark:#145260;--primary-light:#e8f5f7;--accent:#f97316;--accent-dark:#ea6300;--text-dark:#1a1a2e;--text-mid:#374151;--text-light:#6b7280;--white:#ffffff;--bg-light:#f7fdfe;--bg-gray:#f3f4f6;--border:#e5e7eb;--shadow:0 4px 24px rgba(26,107,122,0.10);--shadow-lg:0 8px 40px rgba(26,107,122,0.15);`
+  },
+  {
+    name: 'Slate Navy',
+    vars: `--primary:#1e3a5f;--primary-dark:#142848;--primary-light:#e8edf5;--accent:#10b981;--accent-dark:#059669;--text-dark:#1a1a2e;--text-mid:#374151;--text-light:#6b7280;--white:#ffffff;--bg-light:#f7f9fc;--bg-gray:#f3f4f6;--border:#e5e7eb;--shadow:0 4px 24px rgba(30,58,95,0.10);--shadow-lg:0 8px 40px rgba(30,58,95,0.15);`
+  },
+  {
+    name: 'Forest Moss',
+    vars: `--primary:#3a5c2e;--primary-dark:#2a4420;--primary-light:#eef4eb;--accent:#f59e0b;--accent-dark:#d97706;--text-dark:#1a1a2e;--text-mid:#374151;--text-light:#6b7280;--white:#ffffff;--bg-light:#f8fcf7;--bg-gray:#f3f4f6;--border:#e5e7eb;--shadow:0 4px 24px rgba(58,92,46,0.10);--shadow-lg:0 8px 40px rgba(58,92,46,0.15);`
+  },
+  {
+    name: 'Warm Mahogany',
+    vars: `--primary:#7a3a1a;--primary-dark:#5e2c12;--primary-light:#f8f0ea;--accent:#10b981;--accent-dark:#059669;--text-dark:#1a1a2e;--text-mid:#374151;--text-light:#6b7280;--white:#ffffff;--bg-light:#fdf8f5;--bg-gray:#f3f4f6;--border:#e5e7eb;--shadow:0 4px 24px rgba(122,58,26,0.10);--shadow-lg:0 8px 40px rgba(122,58,26,0.15);`
+  },
+  {
+    name: 'Indigo Purple',
+    vars: `--primary:#3d1a7a;--primary-dark:#2e1260;--primary-light:#ede8f8;--accent:#f59e0b;--accent-dark:#d97706;--text-dark:#1a1a2e;--text-mid:#374151;--text-light:#6b7280;--white:#ffffff;--bg-light:#faf8fd;--bg-gray:#f3f4f6;--border:#e5e7eb;--shadow:0 4px 24px rgba(61,26,122,0.10);--shadow-lg:0 8px 40px rgba(61,26,122,0.15);`
+  },
+  {
+    name: 'Steel Blue',
+    vars: `--primary:#2563a8;--primary-dark:#1a4a82;--primary-light:#e8f1fb;--accent:#f59e0b;--accent-dark:#d97706;--text-dark:#1a1a2e;--text-mid:#374151;--text-light:#6b7280;--white:#ffffff;--bg-light:#f5f9ff;--bg-gray:#f3f4f6;--border:#e5e7eb;--shadow:0 4px 24px rgba(37,99,168,0.10);--shadow-lg:0 8px 40px rgba(37,99,168,0.15);`
+  },
+  {
+    name: 'Terracotta',
+    vars: `--primary:#c1440e;--primary-dark:#9a350b;--primary-light:#fdf0eb;--accent:#0ea5e9;--accent-dark:#0284c7;--text-dark:#1a1a2e;--text-mid:#374151;--text-light:#6b7280;--white:#ffffff;--bg-light:#fffaf8;--bg-gray:#f3f4f6;--border:#e5e7eb;--shadow:0 4px 24px rgba(193,68,14,0.10);--shadow-lg:0 8px 40px rgba(193,68,14,0.15);`
+  },
+  {
+    name: 'Charcoal Pro',
+    vars: `--primary:#2d3748;--primary-dark:#1a202c;--primary-light:#edf2f7;--accent:#f59e0b;--accent-dark:#d97706;--text-dark:#1a1a2e;--text-mid:#374151;--text-light:#6b7280;--white:#ffffff;--bg-light:#f7fafc;--bg-gray:#f3f4f6;--border:#e5e7eb;--shadow:0 4px 24px rgba(45,55,72,0.10);--shadow-lg:0 8px 40px rgba(45,55,72,0.15);`
+  },
+  {
+    name: 'Sage Green',
+    vars: `--primary:#4a7c59;--primary-dark:#365c42;--primary-light:#edf5f0;--accent:#f97316;--accent-dark:#ea6300;--text-dark:#1a1a2e;--text-mid:#374151;--text-light:#6b7280;--white:#ffffff;--bg-light:#f5faf7;--bg-gray:#f3f4f6;--border:#e5e7eb;--shadow:0 4px 24px rgba(74,124,89,0.10);--shadow-lg:0 8px 40px rgba(74,124,89,0.15);`
+  },
+  {
+    name: 'Deep Crimson',
+    vars: `--primary:#9b1c1c;--primary-dark:#771414;--primary-light:#fdf0f0;--accent:#f59e0b;--accent-dark:#d97706;--text-dark:#1a1a2e;--text-mid:#374151;--text-light:#6b7280;--white:#ffffff;--bg-light:#fffafa;--bg-gray:#f3f4f6;--border:#e5e7eb;--shadow:0 4px 24px rgba(155,28,28,0.10);--shadow-lg:0 8px 40px rgba(155,28,28,0.15);`
+  },
+  {
+    name: 'Cobalt Cyan',
+    vars: `--primary:#0e7490;--primary-dark:#0a5870;--primary-light:#e0f5f9;--accent:#f59e0b;--accent-dark:#d97706;--text-dark:#1a1a2e;--text-mid:#374151;--text-light:#6b7280;--white:#ffffff;--bg-light:#f0fbfe;--bg-gray:#f3f4f6;--border:#e5e7eb;--shadow:0 4px 24px rgba(14,116,144,0.10);--shadow-lg:0 8px 40px rgba(14,116,144,0.15);`
+  },
+  {
+    name: 'Plum',
+    vars: `--primary:#6b21a8;--primary-dark:#52187e;--primary-light:#f5eeff;--accent:#10b981;--accent-dark:#059669;--text-dark:#1a1a2e;--text-mid:#374151;--text-light:#6b7280;--white:#ffffff;--bg-light:#fdf9ff;--bg-gray:#f3f4f6;--border:#e5e7eb;--shadow:0 4px 24px rgba(107,33,168,0.10);--shadow-lg:0 8px 40px rgba(107,33,168,0.15);`
+  },
+  {
+    name: 'Midnight Green',
+    vars: `--primary:#065f46;--primary-dark:#044733;--primary-light:#ecfdf5;--accent:#f59e0b;--accent-dark:#d97706;--text-dark:#1a1a2e;--text-mid:#374151;--text-light:#6b7280;--white:#ffffff;--bg-light:#f0fdf9;--bg-gray:#f3f4f6;--border:#e5e7eb;--shadow:0 4px 24px rgba(6,95,70,0.10);--shadow-lg:0 8px 40px rgba(6,95,70,0.15);`
+  },
+];
+
+const DESIGN_STYLES = [
+  { name: 'Glassmorphism' },
+  { name: 'Neomorphism' },
+  { name: 'Minimalism' },
+  { name: 'Material Design' },
+  { name: 'Skeuomorphism' },
+  { name: 'Flat Design' },
+  { name: 'Dark Luxury' },
+  { name: 'Organic / Nature' },
+  { name: 'Swiss / International Style' },
+];
+
+const HERO_LAYOUTS = [
+  { name: 'Split left text right image' },
+  { name: 'Split left image right text' },
+  { name: 'Centered with image below' },
+  { name: 'Full bleed background image with overlay text' },
+  { name: 'Floating card over gradient background' },
+  { name: 'Magazine grid asymmetric' },
+];
+
+const TYPOGRAPHY_PAIRINGS = [
+  { heading: 'Playfair Display', body: 'Inter' },
+  { heading: 'Montserrat', body: 'Open Sans' },
+  { heading: 'Oswald', body: 'Lato' },
+  { heading: 'Cormorant Garamond', body: 'Jost' },
+  { heading: 'Bebas Neue', body: 'Roboto' },
+  { heading: 'Space Grotesk', body: 'DM Sans' },
+  { heading: 'Raleway', body: 'Nunito' },
+  { heading: 'Libre Baskerville', body: 'Mulish' },
+  { heading: 'Anton', body: 'Barlow' },
+  { heading: 'Merriweather', body: 'Source Sans Pro' },
+];
+
+const UI_MOTIFS = [
+  { name: 'Pill shaped buttons with soft rounded cards' },
+  { name: 'Sharp rectangular buttons with angular cards' },
+  { name: 'Ghost outlined buttons with border accent cards' },
+  { name: 'Large icon badges above each feature' },
+  { name: 'Numbered steps layout' },
+  { name: 'Alternating image text sections' },
+];
+
 const DESIGN_DNA = {
-  colorPalettes: [
-    {
-      name: 'Ocean blue',
-      primary: '#0077B6', secondary: '#023E8A', accent: '#90E0EF',
-      bg: '#03045E', text: '#FFFFFF', subtle: '#CAF0F8',
-    },
-    {
-      name: 'Sunset orange',
-      primary: '#E76F51', secondary: '#264653', accent: '#F4A261',
-      bg: '#1A1A2E', text: '#FFFFFF', subtle: '#FFDDD2',
-    },
-    {
-      name: 'Forest green',
-      primary: '#2D6A4F', secondary: '#1B4332', accent: '#95D5B2',
-      bg: '#081C15', text: '#FFFFFF', subtle: '#D8F3DC',
-    },
-    {
-      name: 'Gold luxury',
-      primary: '#D4A017', secondary: '#1A1A1A', accent: '#FFD700',
-      bg: '#0D0D0D', text: '#FFFFFF', subtle: '#FFF8DC',
-    },
-    {
-      name: 'Crimson power',
-      primary: '#C1121F', secondary: '#780000', accent: '#FF6B6B',
-      bg: '#03071E', text: '#FFFFFF', subtle: '#FFE8E8',
-    },
-    {
-      name: 'Purple galaxy',
-      primary: '#7B2FBE', secondary: '#240046', accent: '#E0AAFF',
-      bg: '#10002B', text: '#FFFFFF', subtle: '#F0E6FF',
-    },
-    {
-      name: 'Teal emerald',
-      primary: '#06D6A0', secondary: '#073B4C', accent: '#00B4D8',
-      bg: '#012A36', text: '#FFFFFF', subtle: '#CCFBF1',
-    },
-    {
-      name: 'Rose gold',
-      primary: '#C9184A', secondary: '#590D22', accent: '#FF758F',
-      bg: '#2D0012', text: '#FFFFFF', subtle: '#FFD6E0',
-    },
-    {
-      name: 'Slate minimal',
-      primary: '#334155', secondary: '#0F172A', accent: '#38BDF8',
-      bg: '#F8FAFC', text: '#0F172A', subtle: '#E2E8F0',
-    },
-    {
-      name: 'Amber fire',
-      primary: '#D97706', secondary: '#451A03', accent: '#FCD34D',
-      bg: '#1C0A00', text: '#FFFFFF', subtle: '#FEF3C7',
-    },
-    {
-      name: 'Cyan futurist',
-      primary: '#00B4D8', secondary: '#023E8A', accent: '#48CAE4',
-      bg: '#03045E', text: '#FFFFFF', subtle: '#CAF0F8',
-    },
-    {
-      name: 'Olive earth',
-      primary: '#6B7C3E', secondary: '#2C2C0E', accent: '#BFD96F',
-      bg: '#1A1A00', text: '#FFFFFF', subtle: '#F0F4DA',
-    },
-    {
-      name: 'Midnight indigo',
-      primary: '#4361EE', secondary: '#3A0CA3', accent: '#7209B7',
-      bg: '#10002B', text: '#FFFFFF', subtle: '#E0AAFF',
-    },
-    {
-      name: 'Ice nordic',
-      primary: '#4CC9F0', secondary: '#4361EE', accent: '#F72585',
-      bg: '#F0F4FF', text: '#0D1B2A', subtle: '#E2EAFF',
-    },
-    {
-      name: 'Coral reef',
-      primary: '#FF6B6B', secondary: '#C9184A', accent: '#FFE66D',
-      bg: '#1A0A0A', text: '#FFFFFF', subtle: '#FFE8E8',
-    },
-    {
-      name: 'Sage wellness',
-      primary: '#52B788', secondary: '#1B4332', accent: '#D8F3DC',
-      bg: '#F0FFF4', text: '#1B4332', subtle: '#E9F5EE',
-    },
-  ],
+  colorPalettes: COLOR_PALETTES,
 
-  designStyles: [
-    {
-      name: 'Glassmorphism',
-      css: `
-        Cards use backdrop-filter: blur(16px) with semi-transparent backgrounds rgba(255,255,255,0.10).
-        Borders are 1px rgba(255,255,255,0.20). Heavy frosted glass panels throughout.
-        Hero background is a vivid gradient mesh behind a floating glass card.
-        Buttons have glass effect with subtle colored glow on hover.
-        Section dividers use semi-transparent lines. Everything feels airy and layered.`,
-    },
-    {
-      name: 'Neomorphism',
-      css: `
-        Background is a single flat muted color (light: #E0E5EC or dark: #1E1E2E).
-        ALL elements use double box-shadow: outset light shadow top-left, dark shadow bottom-right.
-        Example: box-shadow: 6px 6px 12px rgba(0,0,0,0.15), -6px -6px 12px rgba(255,255,255,0.07).
-        Buttons look pressed into the surface using inset shadows on :active.
-        No harsh borders anywhere. Tactile 3D feel. Cards appear to float off the surface.`,
-    },
-    {
-      name: 'Dark luxury',
-      css: `
-        Very dark near-black background (#0A0A0A or #0D0D0D).
-        Gold or platinum accent color used for ALL headings, borders, and highlights.
-        Thin 1px gold borders on every card. Fine gold gradient lines as section dividers.
-        Serif heading font required. Premium editorial magazine feel.
-        Subtle gold shimmer animation on hero headline using CSS gradient animation.`,
-    },
-    {
-      name: 'Clean minimal',
-      css: `
-        Maximum white space — generous padding everywhere (80px+ sections).
-        Pure white or very light background. ONE strong accent color only, used sparingly.
-        Large bold sans-serif headlines. Zero decorative elements anywhere.
-        Strict grid-based layout. Buttons are simple outlined or flat.
-        Content breathes. Trust and clarity above all else.`,
-    },
-    {
-      name: 'Bold editorial',
-      css: `
-        High contrast — black and white base with ONE vivid accent color.
-        Oversized typography — hero headline 72px minimum, extremely bold (900 weight).
-        Asymmetric layouts deliberately. Large full-bleed image sections.
-        Bold thick horizontal rules between sections. Magazine newspaper aesthetic.
-        Text deliberately overlaps images in hero. Dramatic and confident.`,
-    },
-    {
-      name: 'Gradient vivid',
-      css: `
-        Every section has its OWN bold gradient — vary direction per section (135deg, 45deg, etc).
-        Mesh gradient hero background. Gradient text on main headlines using background-clip: text.
-        Bright saturated colors. Glowing colored box-shadows on buttons and cards.
-        Gradient borders on feature cards using border-image or pseudo-element trick.
-        Energy and excitement. Nothing is flat or neutral.`,
-    },
-    {
-      name: 'Retro Y2K',
-      css: `
-        Chunky 3px solid black borders on ALL elements — cards, buttons, sections.
-        Hard offset box-shadows: box-shadow: 4px 4px 0px #000000 (no blur).
-        Bright pop colors — yellows, hot pinks, electric greens mixed boldly.
-        Sticker-style badges with jagged or star burst shapes using clip-path.
-        Fun chunky display font for headings. Playful and nostalgic energy.`,
-    },
-    {
-      name: 'Nature organic',
-      css: `
-        Very soft rounded corners everywhere — border-radius 24px to 48px on cards.
-        Earthy warm color palette. Organic blob SVG shapes as background decorations.
-        Gentle subtle gradients — never harsh. Lots of breathing room and padding.
-        Feels calm, trustworthy, health and wellness oriented.
-        Soft sans-serif fonts. Section backgrounds use very subtle texture patterns.`,
-    },
-    {
-      name: 'Cyberpunk neon',
-      css: `
-        Dark or black background always. Neon glowing colors — cyan, magenta, lime green.
-        Text and borders glow using text-shadow and box-shadow with colored blur.
-        Diagonal angled design elements — skewed sections using clip-path or transform: skewY.
-        Monospace or condensed tech font for headings. Grid line background pattern.
-        Futuristic and high-energy. Feels like a sci-fi interface.`,
-    },
-    {
-      name: 'Soft pastel',
-      css: `
-        Very light pastel backgrounds — pale pink, lavender, mint, peach rotated per section.
-        Rounded pill shapes everywhere — buttons especially radius: 50px.
-        Soft drop shadows — no harsh edges. Watercolor or gradient blob decorations.
-        Friendly approachable font pairing. Ideal for health beauty wellness products.
-        Colors never saturated — always tinted toward white. Gentle and inviting.`,
-    },
-  ],
-
-  heroLayouts: [
-    'SPLIT LAYOUT: Headline, subheadline, bullet benefits, and CTA button stacked on the LEFT half (50%). Large product image with drop shadow on the RIGHT half (50%). Vertically centered.',
-    'CENTERED LAYOUT: All hero content centered. Giant headline top. Subheadline below. CTA button below that. Product image displayed large and centered BELOW the CTA inside a styled showcase container.',
-    'FULL-WIDTH OVERLAY: Large product/lifestyle image as full hero background. Dark semi-transparent overlay (rgba 0,0,0,0.55). White text headline and CTA overlaid centered on top.',
-    'REVERSE SPLIT: Product image large on the LEFT half. Headline, benefits, and CTA stacked on the RIGHT half. Creates visual balance opposite of standard split.',
-    'MAGAZINE GRID: Giant oversized headline spanning top-left 60%. Product image top-right 40%. Subheadline and CTA span full width below as a second row. Editorial feel.',
-    'FLOATING CARD HERO: Full gradient or image background. A floating card (glassmorphism or elevated white) centered containing headline, subheadline, rating stars, and CTA. Card appears to float above the background.',
-  ],
-
-  typographyPairings: [
-    {
-      heading: "'Playfair Display', serif",
-      body: "'Inter', sans-serif",
-      feel: 'elegant editorial — classic meets modern',
-      import: 'Playfair+Display:wght@700;900&family=Inter:wght@400;500;600',
-    },
-    {
-      heading: "'Montserrat', sans-serif",
-      body: "'Open Sans', sans-serif",
-      feel: 'modern clean professional',
-      import: 'Montserrat:wght@700;800;900&family=Open+Sans:wght@400;500;600',
-    },
-    {
-      heading: "'Oswald', sans-serif",
-      body: "'Lato', sans-serif",
-      feel: 'strong bold impactful',
-      import: 'Oswald:wght@600;700&family=Lato:wght@400;700',
-    },
-    {
-      heading: "'Merriweather', serif",
-      body: "'Source Sans Pro', sans-serif",
-      feel: 'trustworthy authoritative',
-      import: 'Merriweather:wght@700;900&family=Source+Sans+Pro:wght@400;600',
-    },
-    {
-      heading: "'Raleway', sans-serif",
-      body: "'Nunito', sans-serif",
-      feel: 'friendly premium approachable',
-      import: 'Raleway:wght@700;800;900&family=Nunito:wght@400;600;700',
-    },
-    {
-      heading: "'Bebas Neue', sans-serif",
-      body: "'Roboto', sans-serif",
-      feel: 'impact sports energy bold',
-      import: 'Bebas+Neue&family=Roboto:wght@400;500;700',
-    },
-    {
-      heading: "'Cormorant Garamond', serif",
-      body: "'Jost', sans-serif",
-      feel: 'luxury refined high-end',
-      import: 'Cormorant+Garamond:wght@600;700&family=Jost:wght@400;500;600',
-    },
-    {
-      heading: "'Space Grotesk', sans-serif",
-      body: "'DM Sans', sans-serif",
-      feel: 'tech forward startup modern',
-      import: 'Space+Grotesk:wght@600;700&family=DM+Sans:wght@400;500',
-    },
-    {
-      heading: "'Anton', sans-serif",
-      body: "'Barlow', sans-serif",
-      feel: 'aggressive high energy performance',
-      import: 'Anton&family=Barlow:wght@400;500;600',
-    },
-    {
-      heading: "'Libre Baskerville', serif",
-      body: "'Mulish', sans-serif",
-      feel: 'academic credible medical health',
-      import: 'Libre+Baskerville:wght@700&family=Mulish:wght@400;600;700',
-    },
-  ],
-
-  uiMotifs: [
-    'PILL BUTTONS: All buttons border-radius: 50px. Feature cards radius: 24px. Testimonial cards radius: 32px. Soft and approachable. Icon circles for feature icons.',
-    'SHARP ANGULAR: All buttons border-radius: 2px. Cards radius: 4px. Professional precise corporate feel. Use thin divider lines between sections.',
-    'GHOST OUTLINED: Primary buttons are outlined (transparent bg, colored border 2px, colored text). Fill on hover. Cards have subtle left-border accent stripe (4px). Editorial feel.',
-    'ICON-FORWARD: Large icon or emoji displayed ABOVE each feature card headline. Benefit icons in a 3-column icon grid. CTA section has a large centered icon above headline.',
-    'NUMBERED STEPS: Benefits and features presented as numbered steps (01, 02, 03) with large displayed numbers. Timeline style. Trust-building sequential narrative.',
-    'ALTERNATING SECTIONS: Features section alternates every row — image LEFT text RIGHT, then text LEFT image RIGHT. Creates dynamic visual rhythm. Each alternating pair is a full-width row.',
-    'CARD GRID HEAVY: Most content lives inside elevated cards with shadows. Features in 3-column card grid. Testimonials in 2-column card grid. Pricing in 3-column card row.',
-    'FULL-WIDTH BANDS: Each section is a full-width colored band. Alternating dark/light bands. Content inside each band is max-width contained and centered.',
-  ],
+  designStyles: DESIGN_STYLES,
+  heroLayouts: HERO_LAYOUTS,
+  typographyPairings: TYPOGRAPHY_PAIRINGS,
+  uiMotifs: UI_MOTIFS,
 };
 
 /**
@@ -300,43 +154,33 @@ function getDesignDNA() {
   const motif = pick(DESIGN_DNA.uiMotifs);
 
   return {
-    dna: `
-===========================================================
-MANDATORY DESIGN DNA — FOLLOW EVERY INSTRUCTION BELOW EXACTLY
-===========================================================
-
-GOOGLE FONTS IMPORT (MUST be first thing inside <head>):
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=${typo.import}&display=swap" rel="stylesheet">
-
+    dna: `==================================================
+MANDATORY DESIGN DNA — FOLLOW EXACTLY
+==================================================
 COLOR PALETTE: "${palette.name}"
-  Primary color   → ${palette.primary}   (headlines, main CTA buttons, key accents)
-  Secondary color → ${palette.secondary}  (section backgrounds, dark fills)
-  Accent color    → ${palette.accent}    (highlights, badges, hover states, underlines)
-  Page background → ${palette.bg}        (main body background color)
-  Body text       → ${palette.text}      (all paragraph and body text)
-  Subtle fills    → ${palette.subtle}    (testimonial bg, light tint sections)
+Apply these CSS variables on :root {}
+${palette.vars}
 
 DESIGN STYLE: "${style.name}"
-${style.css}
+Build the entire page using the ${style.name} design concept.
+Apply consistently to every section. Do not mix styles.
 
-HERO SECTION LAYOUT:
-  ${hero}
+HERO LAYOUT: ${hero.name}
 
 TYPOGRAPHY:
-  Heading font → ${typo.heading}   (use for ALL h1 h2 h3 headings)
-  Body font    → ${typo.body}      (use for ALL paragraphs, labels, buttons)
-  Design feel  → ${typo.feel}
+Heading font → ${typo.heading} (import from Google Fonts)
+Body font    → ${typo.body} (import from Google Fonts)
 
-UI MOTIF:
-  ${motif}
+UI MOTIF: ${motif.name}
 
-ABSOLUTE RULES — NEVER VIOLATE THESE:
-  1. Apply the design style to EVERY section — not just hero. Consistent throughout.
-===========================================================
-`,
-    summary: `${palette.name} | ${style.name} | ${typo.feel} | ${motif.split(':')[0]}`,
+RULES:
+1. Google Fonts <link> must be first inside <head>
+2. Use var(--primary) for buttons, headings, key accents
+3. Use var(--accent) for badges, highlights, secondary CTAs
+4. Use var(--bg-light) as page background
+5. Use var(--shadow) on cards, var(--shadow-lg) on hero
+==================================================`,
+    summary: `${palette.name} | ${style.name} | ${typo.heading} / ${typo.body} | ${motif.name}`,
   };
 }
 
