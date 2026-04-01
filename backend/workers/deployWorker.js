@@ -101,14 +101,7 @@ const DESIGN_STYLES = [
   { name: 'Swiss / International Style' },
 ];
 
-const HERO_LAYOUTS = [
-  { name: 'Split left text right image' },
-  { name: 'Split left image right text' },
-  { name: 'Centered with image below' },
-  { name: 'Full bleed background image with overlay text' },
-  { name: 'Floating card over gradient background' },
-  { name: 'Magazine grid asymmetric' },
-];
+
 
 const TYPOGRAPHY_PAIRINGS = [
   { heading: 'Playfair Display', body: 'Inter' },
@@ -134,9 +127,7 @@ const UI_MOTIFS = [
 
 const DESIGN_DNA = {
   colorPalettes: COLOR_PALETTES,
-
   designStyles: DESIGN_STYLES,
-  heroLayouts: HERO_LAYOUTS,
   typographyPairings: TYPOGRAPHY_PAIRINGS,
   uiMotifs: UI_MOTIFS,
 };
@@ -149,7 +140,6 @@ function getDesignDNA() {
 
   const palette = pick(DESIGN_DNA.colorPalettes);
   const style = pick(DESIGN_DNA.designStyles);
-  const hero = pick(DESIGN_DNA.heroLayouts);
   const typo = pick(DESIGN_DNA.typographyPairings);
   const motif = pick(DESIGN_DNA.uiMotifs);
 
@@ -164,8 +154,6 @@ ${palette.vars}
 DESIGN STYLE: "${style.name}"
 Build the entire page using the ${style.name} design concept.
 Apply consistently to every section. Do not mix styles.
-
-HERO LAYOUT: ${hero.name}
 
 TYPOGRAPHY:
 Heading font → ${typo.heading} (import from Google Fonts)
