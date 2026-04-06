@@ -6,9 +6,11 @@ import Dashboard from './pages/Dashboard';
 import Credentials from './pages/Credentials';
 import CreateCampaign from './pages/CreateCampaign';
 import Websites from './pages/Websites';
+import StaticWebsites from './pages/StaticWebsites';
 import EditWebsite from './pages/EditWebsite';
 import Domains from './pages/Domains';
 import AdminTemplates from './pages/AdminTemplates';
+import AdminStaticTemplates from './pages/AdminStaticTemplates';
 import AdminUsers from './pages/AdminUsers';
 import PrivateRoute from './routing/PrivateRoute';
 import Layout from './components/Layout';
@@ -24,9 +26,11 @@ function App() {
         <Route path="/credentials" element={<PrivateRoute><Layout><Credentials /></Layout></PrivateRoute>} />
         <Route path="/create-campaign" element={<PrivateRoute><Layout><CreateCampaign /></Layout></PrivateRoute>} />
         <Route path="/websites" element={<PrivateRoute><Layout><Websites /></Layout></PrivateRoute>} />
+        <Route path="/static-websites" element={<PrivateRoute><Layout><StaticWebsites /></Layout></PrivateRoute>} />
         <Route path="/edit-website/:id" element={<PrivateRoute><Layout><EditWebsite /></Layout></PrivateRoute>} />
         <Route path="/domains" element={<PrivateRoute><Layout><Domains /></Layout></PrivateRoute>} />
         <Route path="/admin/templates" element={<PrivateRoute><Layout><AdminTemplates /></Layout></PrivateRoute>} />
+        <Route path="/admin/static-templates" element={<PrivateRoute><Layout><AdminStaticTemplates /></Layout></PrivateRoute>} />
         <Route path="/admin/users" element={<PrivateRoute><Layout><AdminUsers /></Layout></PrivateRoute>} />
       </Routes>
     </Router>

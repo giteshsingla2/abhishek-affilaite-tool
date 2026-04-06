@@ -5,8 +5,9 @@ const auth = require('../middleware/authMiddleware');
 const Campaign = require('../models/Campaign');
 const Credential = require('../models/Credential');
 const Template = require('../models/Template');
+const StaticTemplate = require('../models/StaticTemplate');
 const Domain = require('../models/Domain');
-const { deployQueue } = require('../workers/deployWorker');
+const { deployQueue, staticDeployQueue } = require('../workers/deployWorker');
 
 // @route   POST /api/campaigns/start
 // @desc    Save campaign + enqueue one job per csv row (Dynamic Headers Support)
@@ -145,6 +146,118 @@ router.post('/start', auth, async (req, res) => {
     return res.json({
       success: true,
       message: `Campaign started with ${queued} sites queued`,
+      queued,
+      campaignId: campaign._id,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ msg: 'Server error' });
+  }
+});
+
+// @route   POST /api/campaigns/start-static
+// @desc    Save campaign + enqueue one job per csv row for Static Templates
+// @access  Private
+router.post('/start-static', auth, async (req, res) => {
+  const { campaignName, staticTemplateId, platformConfig, csvData, model } = req.body;
+
+  if (!campaignName || String(campaignName).trim() === '') {
+    return res.status(400).json({ msg: 'campaignName is required' });
+  }
+
+  if (!staticTemplateId) {
+    return res.status(400).json({ msg: 'staticTemplateId is required' });
+  }
+
+  if (!platformConfig || !platformConfig.platform) {
+    return res.status(400).json({ msg: 'platformConfig.platform is required' });
+  }
+
+  if (platformConfig.platform !== 'custom_domain' && !platformConfig.credentialId) {
+    return res.status(400).json({ msg: 'platformConfig.credentialId is required for this platform' });
+  }
+
+  if (!Array.isArray(csvData) || csvData.length === 0) {
+    return res.status(400).json({ msg: 'csvData must be a non-empty array' });
+  }
+
+  const { platform, credentialId, bucketName, rootFolder, domainName, useDynamicDomain } = platformConfig;
+
+  try {
+    // 1. Fetch Static Template
+    const staticTemplate = await StaticTemplate.findById(staticTemplateId);
+    if (!staticTemplate) {
+      return res.status(404).json({ msg: 'Static Template not found' });
+    }
+
+    // 2. Platform validations (same logic as existing start route)
+    let allowedDomains = null;
+    if (platform === 'custom_domain' && useDynamicDomain) {
+      const csvDomains = [...new Set(csvData.map(row => String(row.domain || '').trim().toLowerCase()).filter(Boolean))];
+      if (csvDomains.length === 0) {
+        return res.status(400).json({ msg: 'CSV file must contain a non-empty `domain` column for dynamic domain mode.' });
+      }
+      const userDomains = await Domain.find({ userId: req.user.id, domain: { $in: csvDomains } });
+      allowedDomains = new Set(userDomains.map(d => d.domain));
+      if (allowedDomains.size === 0) {
+        return res.status(403).json({ msg: 'None of the domains in the CSV are registered to your account.' });
+      }
+    } else if (platform !== 'custom_domain') {
+      const credential = await Credential.findById(credentialId);
+      if (!credential) return res.status(404).json({ msg: 'Credential not found' });
+      if (credential.userId.toString() !== req.user.id) return res.status(403).json({ msg: 'Unauthorized credential' });
+    }
+
+    // 3. Create Campaign Record
+    const campaign = await Campaign.create({
+      userId: req.user.id,
+      name: String(campaignName).trim(),
+      status: 'processing',
+      platform,
+      credentialId: platform === 'custom_domain' ? null : credentialId,
+      domainName: platform === 'custom_domain' ? domainName : undefined,
+      staticTemplateId,
+      bucketName,
+      rootFolder,
+    });
+
+    // 4. Queue Jobs (to static-deploy-queue)
+    let queued = 0;
+    for (let i = 0; i < csvData.length; i++) {
+      const row = csvData[i];
+      if (!row || Object.keys(row).length === 0) continue;
+
+      // Filter rows missing required headers
+      const missing = (staticTemplate.requiredCsvHeaders || []).filter(
+        (h) => !row[h] || String(row[h]).trim() === ''
+      );
+      if (missing.length > 0) continue;
+
+      if (useDynamicDomain && platform === 'custom_domain') {
+        const cleanDomain = String(row.domain || '').trim().toLowerCase();
+        if (!cleanDomain || !allowedDomains.has(cleanDomain)) continue;
+        row.domain = cleanDomain;
+      }
+
+      await staticDeployQueue.add('static-deploy-job', {
+        campaignMode: 'static_template',
+        campaignId: campaign._id,
+        staticTemplateId,
+        platform,
+        credentialId: platform === 'custom_domain' ? null : credentialId,
+        domainName: useDynamicDomain ? row.domain : domainName,
+        row: row,
+        bucketName,
+        rootFolder,
+        model: req.body.model || process.env.OPENROUTER_MODEL,
+      });
+
+      queued++;
+    }
+
+    return res.json({
+      success: true,
+      message: `Static Campaign started with ${queued} sites queued`,
       queued,
       campaignId: campaign._id,
     });

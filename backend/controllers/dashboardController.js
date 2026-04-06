@@ -1,4 +1,5 @@
 const Website = require('../models/Website');
+const StaticWebsite = require('../models/StaticWebsite');
 
 // @desc    Get dashboard statistics
 // @route   GET /api/dashboard/stats
@@ -9,6 +10,8 @@ const getStats = async (req, res) => {
 
     const totalWebsitesLive = await Website.countDocuments({ userId, status: 'Live' });
     const totalDeployments = await Website.countDocuments({ userId });
+    const totalStaticWebsitesLive = await StaticWebsite.countDocuments({ userId, status: 'Live' });
+    const totalStaticDeployments = await StaticWebsite.countDocuments({ userId });
 
     // Mock data for stats that are not tracked yet
     const storageUsed = '45%'; // This would require more complex calculation
@@ -17,6 +20,8 @@ const getStats = async (req, res) => {
     res.json({
       totalWebsitesLive,
       totalDeployments,
+      totalStaticWebsitesLive,
+      totalStaticDeployments,
       storageUsed,
       creditsRemaining,
     });

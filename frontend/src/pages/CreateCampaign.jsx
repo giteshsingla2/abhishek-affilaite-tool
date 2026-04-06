@@ -29,8 +29,11 @@ const AVAILABLE_MODELS = [
   },
 ];
 
+import { PlusCircle, Globe, KeyRound, FileText, Users, Globe2, FileCode, Wand2, Layout, ArrowLeft } from 'lucide-react';
+
 const CreateCampaign = () => {
-  const [step, setStep] = useState(1);
+  const [mode, setMode] = useState(null); // 'ai' or 'static'
+  const [step, setStep] = useState(0);
 
   // Step 1: Template Selection
   const [templates, setTemplates] = useState([]);
@@ -107,7 +110,11 @@ const CreateCampaign = () => {
         }
 
         const fields = (results.meta?.fields || []).map((f) => String(f || '').trim());
-        const missingHeaders = selectedTemplate.requiredCsvHeaders.filter((h) => !fields.includes(h));
+        const required = mode === 'static' 
+          ? [...(selectedTemplate.requiredCsvHeaders || []), 'sub_domain', 'domain'] 
+          : (selectedTemplate.requiredCsvHeaders || []);
+        
+        const missingHeaders = required.filter((h) => !fields.includes(h));
 
         if (missingHeaders.length) {
           setParseError(`CSV is missing required columns: ${missingHeaders.join(', ')}.`);
@@ -146,14 +153,15 @@ const CreateCampaign = () => {
     setSubmitError('');
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get('/api/templates', { headers: { 'x-auth-token': token } });
+      const endpoint = mode === 'static' ? '/api/static-templates' : '/api/templates';
+      const res = await axios.get(endpoint, { headers: { 'x-auth-token': token } });
       setTemplates(res.data || []);
     } catch (err) {
       setSubmitError(err?.response?.data?.msg || 'Failed to load templates');
     } finally {
       setLoadingTemplates(false);
     }
-  }, []);
+  }, [mode]);
 
   const fetchCredentials = useCallback(async (selectedPlatform) => {
     setLoadingCredentials(true);
@@ -295,7 +303,7 @@ const CreateCampaign = () => {
 
       const payload = {
         campaignName,
-        templateId: selectedTemplate?._id,
+        [mode === 'static' ? 'staticTemplateId' : 'templateId']: selectedTemplate?._id,
         model: selectedModel,
         platformConfig: {
           platform,
@@ -309,9 +317,10 @@ const CreateCampaign = () => {
         csvData,
       };
 
-      console.log('[DEBUG] Submitting campaign with payload:', payload);
+      const endpoint = mode === 'static' ? '/api/campaigns/start-static' : '/api/campaigns/start';
+      console.log(`[DEBUG] Submitting ${mode} campaign with payload:`, payload);
       const res = await axios.post(
-        '/api/campaigns/start',
+        endpoint,
         payload,
         {
           headers: {
@@ -334,36 +343,78 @@ const CreateCampaign = () => {
       <h1 className="text-4xl font-bold mb-6">Create Campaign</h1>
 
       <div className="max-w-5xl mx-auto space-y-6">
-        <GlassCard className="p-6">
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div className="text-white/80">Step {step} of 3</div>
-            <div className="flex gap-2">
-              <button
-                className={`px-4 py-2 rounded-lg border border-white/10 ${step === 1 ? 'bg-white/10' : 'bg-transparent hover:bg-white/5'}`}
-                onClick={() => setStep(1)}
-                type="button"
-              >
-                1. Select Template
-              </button>
-              <button
-                className={`px-4 py-2 rounded-lg border border-white/10 ${step === 2 ? 'bg-white/10' : 'bg-transparent hover:bg-white/5'}`}
-                onClick={goToStep2}
-                type="button"
-                disabled={!selectedTemplate}
-              >
-                2. Upload Data
-              </button>
-              <button
-                className={`px-4 py-2 rounded-lg border border-white/10 ${step === 3 ? 'bg-white/10' : 'bg-transparent hover:bg-white/5'}`}
-                onClick={goToStep3}
-                type="button"
-                disabled={!csvData.length || !selectedTemplate || invalidCount > 0}
-              >
-                3. Deployment
-              </button>
-            </div>
+        {step === 0 && (
+          <div className="grid md:grid-cols-2 gap-8 py-10 animate-fade-in">
+            <button 
+              onClick={() => { setMode('ai'); setStep(1); }}
+              className="group relative bg-white/5 border border-white/10 p-8 rounded-3xl text-left hover:bg-white/10 transition-all hover:border-purple-500/50 flex flex-col items-center text-center"
+            >
+              <div className="bg-purple-500/20 p-4 rounded-2xl mb-6 group-hover:scale-110 transition-transform">
+                <Wand2 className="text-purple-400" size={48} />
+              </div>
+              <h2 className="text-2xl font-bold mb-3">Auto AI Website</h2>
+              <p className="text-gray-400 text-sm leading-relaxed mb-6">
+                AI generates the complete HTML page from scratch. Maximum design variety. Best for creative flexibility.
+              </p>
+              <span className="mt-auto bg-white/10 text-white/50 text-[10px] uppercase font-bold tracking-widest px-3 py-1 rounded-full">Current Method</span>
+            </button>
+
+            <button 
+              onClick={() => { setMode('static'); setStep(1); }}
+              className="group relative bg-white/5 border border-white/10 p-8 rounded-3xl text-left hover:bg-white/10 transition-all hover:border-blue-500/50 flex flex-col items-center text-center"
+            >
+              <div className="bg-blue-500/20 p-4 rounded-2xl mb-6 group-hover:scale-110 transition-transform">
+                <Layout className="text-blue-400" size={48} />
+              </div>
+              <div className="absolute top-4 right-4 bg-blue-500 text-white text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-tighter">Recommended</div>
+              <h2 className="text-2xl font-bold mb-3">Templatic Website</h2>
+              <p className="text-gray-400 text-sm leading-relaxed mb-6">
+                AI generates only the content and fills a pre-designed HTML template. 10x cheaper. Consistent professional design.
+              </p>
+              <span className="mt-auto bg-blue-500/20 text-blue-300 text-[10px] uppercase font-bold tracking-widest px-3 py-1 rounded-full">New Method</span>
+            </button>
           </div>
-        </GlassCard>
+        )}
+
+        {step > 0 && (
+          <GlassCard className="p-6">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-4">
+                 <button onClick={() => { setStep(0); setMode(null); setSelectedTemplate(null); }} className="p-2 rounded-full hover:bg-white/10 text-gray-400 transition-colors">
+                    <ArrowLeft size={20} />
+                 </button>
+                 <div className="text-white/80 font-medium">
+                    {mode === 'static' ? 'Templatic Mode' : 'Auto AI Mode'} — Step {step} of 3
+                 </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  className={`px-4 py-2 rounded-lg border border-white/10 ${step === 1 ? 'bg-white/10' : 'bg-transparent hover:bg-white/5'}`}
+                  onClick={() => setStep(1)}
+                  type="button"
+                >
+                  1. Select Template
+                </button>
+                <button
+                  className={`px-4 py-2 rounded-lg border border-white/10 ${step === 2 ? 'bg-white/10' : 'bg-transparent hover:bg-white/5'}`}
+                  onClick={goToStep2}
+                  type="button"
+                  disabled={!selectedTemplate}
+                >
+                  2. Upload Data
+                </button>
+                <button
+                  className={`px-4 py-2 rounded-lg border border-white/10 ${step === 3 ? 'bg-white/10' : 'bg-transparent hover:bg-white/5'}`}
+                  onClick={goToStep3}
+                  type="button"
+                  disabled={!csvData.length || !selectedTemplate || invalidCount > 0}
+                >
+                  3. Deployment
+                </button>
+              </div>
+            </div>
+          </GlassCard>
+        )}
 
         {step === 1 && (
           <GlassCard className="p-6">
@@ -462,7 +513,7 @@ const CreateCampaign = () => {
                 This template requires the following columns:
               </div>
               <div className="text-white/70 font-mono text-sm break-words mb-6">
-                [{selectedTemplate?.requiredCsvHeaders.join(', ')}]
+                [{ (mode === 'static' ? [...(selectedTemplate?.requiredCsvHeaders || []), 'sub_domain', 'domain'] : (selectedTemplate?.requiredCsvHeaders || [])).join(', ') }]
               </div>
               <div>
                 <input

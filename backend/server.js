@@ -28,6 +28,8 @@ app.use('/api/websites', require('./routes/websiteRoutes'));
 app.use('/api/dashboard', require('./routes/dashboardRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/domains', require('./routes/domainRoutes'));
+app.use('/api/static-templates', require('./routes/staticTemplateRoutes'));
+app.use('/api/static-websites', require('./routes/staticWebsiteRoutes'));
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'Server is running' });

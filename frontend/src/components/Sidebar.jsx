@@ -1,11 +1,12 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, PlusCircle, Globe, KeyRound, FileText, Users, Globe2 } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, Globe, KeyRound, FileText, Users, Globe2, FileCode } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 const baseNavItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/websites', label: 'My Websites', icon: Globe },
+  { href: '/static-websites', label: 'Static Websites', icon: FileText },
   { href: '/domains', label: 'Custom Domains', icon: Globe2 },
   { href: '/credentials', label: 'Credentials', icon: KeyRound },
 ];
@@ -17,6 +18,7 @@ const Sidebar = () => {
   const navItems = [...baseNavItems];
   if (isAdmin) {
     navItems.push({ href: '/admin/templates', label: 'Admin Templates', icon: FileText });
+    navItems.push({ href: '/admin/static-templates', label: 'Static Templates', icon: FileCode });
     navItems.push({ href: '/admin/users', label: 'User Management', icon: Users });
   }
   return (

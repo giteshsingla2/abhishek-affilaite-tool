@@ -10,8 +10,11 @@ const Credential = require('../models/Credential');
 const Template = require('../models/Template');
 const Campaign = require('../models/Campaign');
 const Website = require('../models/Website');
+const StaticTemplate = require('../models/StaticTemplate');
+const StaticWebsite = require('../models/StaticWebsite');
 const { uploadToS3 } = require('../services/uploaders/s3Adapter');
 const { uploadToNetlify } = require('../services/uploaders/netlifyAdapter');
+const { injectIntoTemplate } = require('../utils/templateInjector');
 
 const USER_SITES_BASE_DIR = process.env.USER_SITES_BASE_DIR || '/var/www/user_sites';
 
@@ -356,4 +359,160 @@ worker.on('failed', (job, err) => {
   console.log(`Job ${job.id} failed:`, err.message);
 });
 
-module.exports = { deployQueue };
+async function generateFromStaticTemplate(staticTemplate, csvRow, model) {
+  // Step 1 — hydrate the prompt with CSV values
+  let prompt = staticTemplate.jsonPrompt;
+  for (const key in csvRow) {
+    prompt = prompt.replace(new RegExp(`{{${key}}}`, 'g'), csvRow[key] || '');
+  }
+
+  // Step 2 — call AI, ask for JSON only
+  const response = await axios.post(
+    'https://openrouter.ai/api/v1/chat/completions',
+    {
+      model: model || process.env.OPENROUTER_MODEL,
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a conversion copywriter. Return ONLY valid JSON. No markdown, no code fences, no explanation before or after.'
+        },
+        { role: 'user', content: prompt }
+      ]
+    },
+    {
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'http://localhost:5173'
+      }
+    }
+  );
+
+  // Step 3 — parse JSON
+  let raw = response.data.choices[0].message.content;
+  raw = raw.replace(/```json|```/g, '').trim();
+
+  let contentJson;
+  try {
+    contentJson = JSON.parse(raw);
+  } catch (e) {
+    throw new Error('AI returned invalid JSON: ' + raw.substring(0, 200));
+  }
+
+  // Step 4 — inject into HTML and return both
+  const finalHtml = injectIntoTemplate(
+    staticTemplate.htmlContent,
+    csvRow,
+    contentJson
+  );
+
+  return { finalHtml, contentJson };
+}
+
+const staticDeployQueue = new Queue('static-deploy-queue', { connection });
+
+const staticWorker = new Worker('static-deploy-queue', async (job) => {
+  const { 
+    staticTemplateId, row, campaignId, 
+    platform, credentialId, domainName: dynamicDomain, model 
+  } = job.data;
+
+  const subDomain = row?.sub_domain;
+
+  const campaign = await Campaign.findById(campaignId);
+  if (!campaign) throw new Error(`Campaign ${campaignId} not found`);
+
+  const targetDomain = dynamicDomain || campaign.domainName;
+
+  // Create initial record
+  const staticWebsite = await StaticWebsite.create({
+    userId: campaign.userId,
+    campaignId,
+    staticTemplateId,
+    productName: row.name || row.product_name || 'Unnamed Product',
+    subdomain: subDomain,
+    domain: targetDomain,
+    platform,
+    status: 'Pending'
+  });
+
+  try {
+    // Fetch template
+    const staticTemplate = await StaticTemplate.findById(staticTemplateId);
+    if (!staticTemplate) throw new Error(`StaticTemplate ${staticTemplateId} not found`);
+
+    // Generate content and HTML
+    const { finalHtml, contentJson } = await generateFromStaticTemplate(
+      staticTemplate, row, model
+    );
+
+    // Inject header code if present
+    let htmlToUpload = finalHtml;
+    const headerCode = String(row.header_code || '').trim();
+    if (headerCode) {
+      htmlToUpload = htmlToUpload.replace('</head>', `${headerCode}\n</head>`);
+    }
+
+    // Fetch credentials if needed
+    let credential = null;
+    if (platform !== 'custom_domain') {
+      const credentialDoc = await Credential.findById(credentialId);
+      if (!credentialDoc) throw new Error(`Credential ${credentialId} not found`);
+      credential = credentialDoc.getDecrypted();
+    }
+
+    // Upload — same logic as existing worker
+    let result;
+    switch (platform) {
+      case 'aws_s3':
+      case 'digital_ocean':
+      case 'backblaze':
+      case 'cloudflare_r2':
+        result = await uploadToS3(htmlToUpload, subDomain, credential, campaign);
+        break;
+      case 'netlify':
+        result = await uploadToNetlify(htmlToUpload, subDomain, credential);
+        break;
+      case 'custom_domain':
+        const sitePath = path.join(USER_SITES_BASE_DIR, targetDomain, subDomain);
+        try {
+          fs.mkdirSync(sitePath, { recursive: true });
+          fs.writeFileSync(path.join(sitePath, 'index.html'), htmlToUpload);
+          result = { success: true, url: `http://${subDomain}.${targetDomain}` };
+        } catch (fsErr) {
+          result = { success: false, error: fsErr.message };
+        }
+        break;
+      default:
+        throw new Error(`Unsupported platform: ${platform}`);
+    }
+
+    if (!result.success) throw new Error(result.error || 'Upload failed');
+
+    // Save — store generatedJson but NOT htmlContent
+    staticWebsite.status = 'Live';
+    staticWebsite.url = result.url;
+    staticWebsite.generatedJson = contentJson;
+    staticWebsite.headerCode = headerCode;
+    if (result.siteId) staticWebsite.siteId = result.siteId;
+    await staticWebsite.save();
+
+    return { url: result.url, staticWebsiteId: staticWebsite._id };
+
+  } catch (error) {
+    console.error(`Static job ${job.id} failed:`, error.message);
+    staticWebsite.status = 'Failed';
+    await staticWebsite.save();
+    throw error;
+  }
+}, { connection });
+
+staticWorker.on('completed', (job, result) => {
+  console.log(`Static job ${job.id} completed:`, result);
+});
+
+staticWorker.on('failed', (job, err) => {
+  console.log(`Static job ${job.id} failed:`, err.message);
+});
+
+module.exports = { deployQueue, staticDeployQueue };
