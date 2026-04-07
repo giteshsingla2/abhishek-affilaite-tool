@@ -304,7 +304,7 @@ const CreateCampaign = () => {
       const payload = {
         campaignName,
         [mode === 'static' ? 'staticTemplateId' : 'templateId']: selectedTemplate?._id,
-        model: selectedModel,
+        model: mode === 'static' ? 'google/gemini-2.0-flash-001' : selectedModel,
         platformConfig: {
           platform,
           credentialId: platform === 'custom_domain' ? undefined : credentialId,
@@ -462,7 +462,7 @@ const CreateCampaign = () => {
               })}
             </div>
 
-            {selectedTemplate && (
+            {selectedTemplate && mode !== 'static' && (
               <div className="mt-8 animate-fade-in-up">
                 <h3 className="text-xl font-bold mb-4">Select AI Model</h3>
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
