@@ -18,8 +18,29 @@ const USER_SITES_BASE_DIR = process.env.USER_SITES_BASE_DIR || '/var/www/user_si
 // @access  Private
 router.get('/', auth, async (req, res) => {
   try {
-    const websites = await StaticWebsite.find({ userId: req.user.id }).sort({ createdAt: -1 });
-    res.json(websites);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const skip = (page - 1) * limit;
+
+    const [websites, total] = await Promise.all([
+      StaticWebsite.find({ userId: req.user.id })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .select('productName status url createdAt platform subdomain domain staticTemplateId siteId headerCode generatedJson')
+        .lean(),
+      StaticWebsite.countDocuments({ userId: req.user.id })
+    ]);
+
+    res.json({
+      websites,
+      pagination: {
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+        limit
+      }
+    });
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server Error');

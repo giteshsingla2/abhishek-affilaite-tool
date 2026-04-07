@@ -54,4 +54,7 @@ const WebsiteSchema = new mongoose.Schema({
   },
 });
 
+WebsiteSchema.index({ userId: 1, createdAt: -1 });
+WebsiteSchema.index({ userId: 1, status: 1 });
+
 module.exports = mongoose.model('Website', WebsiteSchema);

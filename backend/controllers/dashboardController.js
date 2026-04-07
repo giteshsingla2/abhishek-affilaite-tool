@@ -8,22 +8,32 @@ const getStats = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const totalWebsitesLive = await Website.countDocuments({ userId, status: 'Live' });
-    const totalDeployments = await Website.countDocuments({ userId });
-    const totalStaticWebsitesLive = await StaticWebsite.countDocuments({ userId, status: 'Live' });
-    const totalStaticDeployments = await StaticWebsite.countDocuments({ userId });
-
-    // Mock data for stats that are not tracked yet
-    const storageUsed = '45%'; // This would require more complex calculation
-    const creditsRemaining = '2,400'; // This requires a credits system
+    const [
+      totalWebsitesLive,
+      totalDeployments,
+      totalStaticWebsitesLive,
+      totalStaticDeployments,
+      recentWebsites
+    ] = await Promise.all([
+      Website.countDocuments({ userId, status: 'Live' }),
+      Website.countDocuments({ userId }),
+      StaticWebsite.countDocuments({ userId, status: 'Live' }),
+      StaticWebsite.countDocuments({ userId }),
+      Website.find({ userId })
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .select('productName status url createdAt platform subdomain')
+        .lean()
+    ]);
 
     res.json({
       totalWebsitesLive,
       totalDeployments,
       totalStaticWebsitesLive,
       totalStaticDeployments,
-      storageUsed,
-      creditsRemaining,
+      storageUsed: '45%',
+      creditsRemaining: '2,400',
+      recentWebsites
     });
   } catch (err) {
     console.error(err.message);

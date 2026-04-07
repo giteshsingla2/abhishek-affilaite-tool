@@ -79,11 +79,17 @@ const StaticWebsites = () => {
   const fetchWebsites = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('/api/static-websites', {
+      const response = await axios.get('/api/static-websites?limit=100', {
         headers: { 'x-auth-token': token }
       });
-      setWebsites(response.data);
-      setFilteredWebsites(response.data);
+      
+      // Handle both old array format and new paginated format for safety
+      const data = Array.isArray(response.data) 
+        ? response.data 
+        : (response.data.websites || []);
+      
+      setWebsites(data);
+      setFilteredWebsites(data);
     } catch (error) {
       console.error('Error fetching static websites:', error);
     } finally {

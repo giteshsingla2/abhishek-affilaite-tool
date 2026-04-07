@@ -124,19 +124,17 @@ const Websites = () => {
   const fetchWebsites = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/websites', {
-        headers: {
-          'x-auth-token': token
-        }
+      const response = await axios.get('/api/websites?limit=100', {
+        headers: { 'x-auth-token': token }
       });
       
-      if (response.ok) {
-        const data = await response.json();
-        setWebsites(data);
-        setFilteredWebsites(data);
-      } else {
-        console.error('Failed to fetch websites');
-      }
+      // Handle both old array format and new paginated format for safety
+      const data = Array.isArray(response.data) 
+        ? response.data 
+        : (response.data.websites || []);
+      
+      setWebsites(data);
+      setFilteredWebsites(data);
     } catch (error) {
       console.error('Error fetching websites:', error);
     } finally {

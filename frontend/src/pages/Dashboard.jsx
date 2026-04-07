@@ -46,13 +46,15 @@ const Dashboard = () => {
       const token = localStorage.getItem('token');
       const config = { headers: { 'x-auth-token': token } };
 
-      const [statsRes, websitesRes] = await Promise.all([
-        axios.get('/api/dashboard/stats', config),
-        axios.get('/api/websites', config),
-      ]);
+      const statsRes = await axios.get('/api/dashboard/stats', config);
 
-      setStats(statsRes.data);
-      setRecentWebsites(websitesRes.data.slice(0, 5)); // Get latest 5
+      setStats({
+        totalWebsitesLive: statsRes.data.totalWebsitesLive,
+        totalDeployments: statsRes.data.totalDeployments,
+        totalStaticWebsitesLive: statsRes.data.totalStaticWebsitesLive,
+        totalStaticDeployments: statsRes.data.totalStaticDeployments,
+      });
+      setRecentWebsites(statsRes.data.recentWebsites || []);
     } catch (err) {
       setError(err.response?.data?.msg || 'Failed to fetch dashboard data');
     }

@@ -59,4 +59,7 @@ const StaticWebsiteSchema = new mongoose.Schema({
   },
 });
 
+StaticWebsiteSchema.index({ userId: 1, createdAt: -1 });
+StaticWebsiteSchema.index({ userId: 1, status: 1 });
+
 module.exports = mongoose.model('StaticWebsite', StaticWebsiteSchema, 'static_websites');
