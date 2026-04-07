@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/authMiddleware');
 const admin = require('../middleware/adminMiddleware');
+const superAdmin = require('../middleware/superAdminMiddleware');
 const StaticTemplate = require('../models/StaticTemplate');
 
 // @route   GET /api/static-templates
@@ -40,8 +41,8 @@ router.get('/:id', async (req, res) => {
 
 // @route   POST /api/static-templates
 // @desc    Create new template
-// @access  Private (Admin)
-router.post('/', [auth, admin], async (req, res) => {
+// @access  Private (Super Admin)
+router.post('/', [auth, superAdmin], async (req, res) => {
   const { name, category, thumbnailUrl, htmlContent, jsonPrompt, requiredCsvHeaders } = req.body;
 
   try {
@@ -65,19 +66,14 @@ router.post('/', [auth, admin], async (req, res) => {
 
 // @route   PUT /api/static-templates/:id
 // @desc    Update template
-// @access  Private (Admin, Owner only)
-router.put('/:id', [auth, admin], async (req, res) => {
+// @access  Private (Super Admin)
+router.put('/:id', [auth, superAdmin], async (req, res) => {
   const { name, category, thumbnailUrl, htmlContent, jsonPrompt, requiredCsvHeaders } = req.body;
 
   try {
     let template = await StaticTemplate.findById(req.params.id);
     if (!template) {
       return res.status(404).json({ msg: 'Template not found' });
-    }
-
-    // Check ownership
-    if (template.addedBy.toString() !== req.user.id) {
-      return res.status(403).json({ msg: 'Not authorized to edit this template' });
     }
 
     // Update fields
@@ -98,17 +94,12 @@ router.put('/:id', [auth, admin], async (req, res) => {
 
 // @route   DELETE /api/static-templates/:id
 // @desc    Delete template
-// @access  Private (Admin, Owner only)
-router.delete('/:id', [auth, admin], async (req, res) => {
+// @access  Private (Super Admin)
+router.delete('/:id', [auth, superAdmin], async (req, res) => {
   try {
     let template = await StaticTemplate.findById(req.params.id);
     if (!template) {
       return res.status(404).json({ msg: 'Template not found' });
-    }
-
-    // Check ownership
-    if (template.addedBy.toString() !== req.user.id) {
-      return res.status(403).json({ msg: 'Not authorized to delete this template' });
     }
 
     await template.deleteOne();

@@ -15,6 +15,9 @@ const AdminUsers = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  const currentUser = JSON.parse(localStorage.getItem('user'));
+  const isSuperAdmin = currentUser?.role === 'superadmin';
+
   const { email, password, role } = formData;
 
   const fetchUsers = useCallback(async () => {
@@ -114,7 +117,9 @@ const AdminUsers = () => {
                   className="w-full p-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
                   <option value="user">User</option>
-                  <option value="admin">Admin</option>
+                  {isSuperAdmin && <option value="admin">Admin</option>}
+                  {isSuperAdmin && <option value="superadmin">Super Admin</option>}
+                  {!isSuperAdmin && <option value="admin" disabled className="opacity-40">Admin (Super Admin only)</option>}
                 </select>
               </div>
               <button
@@ -150,14 +155,25 @@ const AdminUsers = () => {
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
-                              {u.role === 'admin' ? <Shield size={16} className="text-purple-400" /> : <User size={16} className="text-blue-400" />}
+                              {u.role === 'superadmin' 
+                                ? <Shield size={16} className="text-yellow-400" /> 
+                                : u.role === 'admin' 
+                                  ? <Shield size={16} className="text-purple-400" /> 
+                                  : <User size={16} className="text-blue-400" />
+                              }
                             </div>
                             <span>{u.email}</span>
                           </div>
                         </td>
                         <td className="py-4 px-4">
-                          <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${u.role === 'admin' ? 'bg-purple-500/20 text-purple-400' : 'bg-blue-500/20 text-blue-400'}`}>
-                            {u.role}
+                          <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
+                            u.role === 'superadmin' 
+                              ? 'bg-yellow-500/20 text-yellow-400' 
+                              : u.role === 'admin' 
+                                ? 'bg-purple-500/20 text-purple-400' 
+                                : 'bg-blue-500/20 text-blue-400'
+                          }`}>
+                            {u.role === 'superadmin' ? 'Super Admin' : u.role}
                           </span>
                         </td>
                         <td className="py-4 px-4 text-right">

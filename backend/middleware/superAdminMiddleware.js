@@ -8,12 +8,12 @@ module.exports = async function(req, res, next) {
 
     const user = await User.findById(req.user.id);
 
-    if (user && (user.role === 'admin' || user.role === 'superadmin')) {
+    if (user && user.role === 'superadmin') {
       next();
     } else {
-      res.status(403).json({ msg: 'Access denied. Admin role required.' });
+      res.status(403).json({ msg: 'Access denied. Super Admin role required.' });
     }
   } catch (err) {
-    res.status(500).json({ msg: 'Server error during admin check' });
+    res.status(500).json({ msg: 'Server error during super admin check' });
   }
 };

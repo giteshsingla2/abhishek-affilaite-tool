@@ -12,19 +12,19 @@ const seedAdmin = async () => {
   await connectDB();
 
   try {
-    const adminEmail = 'example@demo.com';
-    const adminPassword = '123456';
+    const adminEmail = 'Singitesh1@gmail.com';
+    const adminPassword = 'Giteshsingla123!@#';
 
     const existingAdmin = await User.findOne({ email: adminEmail });
 
     if (existingAdmin) {
-      console.log('Admin user already exists.');
-      if (existingAdmin.role !== 'admin') {
-        existingAdmin.role = 'admin';
+      console.log('Super Admin user already exists.');
+      if (existingAdmin.role !== 'superadmin') {
+        existingAdmin.role = 'superadmin';
         await existingAdmin.save();
-        console.log(`User ${adminEmail} has been promoted to admin.`);
+        console.log(`User ${adminEmail} has been promoted to superadmin.`);
       } else {
-        console.log(`User ${adminEmail} is already an admin.`);
+        console.log(`User ${adminEmail} is already a superadmin.`);
       }
       return;
     }
@@ -35,11 +35,11 @@ const seedAdmin = async () => {
     const adminUser = new User({
       email: adminEmail,
       password: hashedPassword,
-      role: 'admin',
+      role: 'superadmin',
     });
 
     await adminUser.save();
-    console.log('Admin user created successfully!');
+    console.log('Super Admin user created successfully!');
 
   } catch (error) {
     console.error('Error seeding admin user:', error);

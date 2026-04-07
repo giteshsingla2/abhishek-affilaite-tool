@@ -15,6 +15,36 @@ import AdminUsers from './pages/AdminUsers';
 import PrivateRoute from './routing/PrivateRoute';
 import Layout from './components/Layout';
 
+const SuperAdminRoute = ({ children }) => {
+  const user = JSON.parse(localStorage.getItem('user'));
+  const isSuperAdmin = user?.role === 'superadmin';
+  
+  if (!localStorage.getItem('token')) {
+    return <Navigate to="/login" />;
+  }
+  
+  if (!isSuperAdmin) {
+    return <Navigate to="/dashboard" />;
+  }
+  
+  return children;
+};
+
+const AdminRoute = ({ children }) => {
+  const user = JSON.parse(localStorage.getItem('user'));
+  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+  
+  if (!localStorage.getItem('token')) {
+    return <Navigate to="/login" />;
+  }
+  
+  if (!isAdmin) {
+    return <Navigate to="/dashboard" />;
+  }
+  
+  return children;
+};
+
 function App() {
   return (
     <Router>
@@ -29,9 +59,9 @@ function App() {
         <Route path="/static-websites" element={<PrivateRoute><Layout><StaticWebsites /></Layout></PrivateRoute>} />
         <Route path="/edit-website/:id" element={<PrivateRoute><Layout><EditWebsite /></Layout></PrivateRoute>} />
         <Route path="/domains" element={<PrivateRoute><Layout><Domains /></Layout></PrivateRoute>} />
-        <Route path="/admin/templates" element={<PrivateRoute><Layout><AdminTemplates /></Layout></PrivateRoute>} />
-        <Route path="/admin/static-templates" element={<PrivateRoute><Layout><AdminStaticTemplates /></Layout></PrivateRoute>} />
-        <Route path="/admin/users" element={<PrivateRoute><Layout><AdminUsers /></Layout></PrivateRoute>} />
+        <Route path="/admin/templates" element={<SuperAdminRoute><Layout><AdminTemplates /></Layout></SuperAdminRoute>} />
+        <Route path="/admin/static-templates" element={<SuperAdminRoute><Layout><AdminStaticTemplates /></Layout></SuperAdminRoute>} />
+        <Route path="/admin/users" element={<AdminRoute><Layout><AdminUsers /></Layout></AdminRoute>} />
       </Routes>
     </Router>
   );

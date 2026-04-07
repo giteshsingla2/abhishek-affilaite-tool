@@ -26,8 +26,10 @@ const Login = () => {
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(userData));
 
-      if (userData.role === 'admin') {
+      if (userData.role === 'superadmin') {
         navigate('/admin/templates');
+      } else if (userData.role === 'admin') {
+        navigate('/admin/users');
       } else {
         navigate('/dashboard');
       }

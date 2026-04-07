@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/authMiddleware');
 const admin = require('../middleware/adminMiddleware');
+const superAdmin = require('../middleware/superAdminMiddleware');
 const User = require('../models/User');
 const Template = require('../models/Template');
 const bcrypt = require('bcryptjs');
@@ -9,7 +10,7 @@ const bcrypt = require('bcryptjs');
 // @route   POST api/admin/templates
 // @desc    Create a new template
 // @access  Admin
-router.post('/templates', [auth, admin], async (req, res) => {
+router.post('/templates', [auth, superAdmin], async (req, res) => {
   let { name, thumbnailUrl, systemPrompt, requiredCsvHeaders } = req.body;
 
   // If requiredCsvHeaders is a string, split it into an array
@@ -35,11 +36,11 @@ router.post('/templates', [auth, admin], async (req, res) => {
 });
 
 // @route   GET api/admin/templates
-// @desc    Get templates added by the current admin
-// @access  Admin
-router.get('/templates', [auth, admin], async (req, res) => {
+// @desc    Get templates added by any admin/superadmin (as only superadmin manages them now)
+// @access  SuperAdmin
+router.get('/templates', [auth, superAdmin], async (req, res) => {
   try {
-    const templates = await Template.find({ addedBy: req.user.id }).sort({ createdAt: -1 });
+    const templates = await Template.find().sort({ createdAt: -1 });
     res.json(templates);
   } catch (err) {
     console.error(err.message);
@@ -48,9 +49,9 @@ router.get('/templates', [auth, admin], async (req, res) => {
 });
 
 // @route   PUT api/admin/templates/:id
-// @desc    Update a template (only if owner)
-// @access  Admin
-router.put('/templates/:id', [auth, admin], async (req, res) => {
+// @desc    Update a template
+// @access  SuperAdmin
+router.put('/templates/:id', [auth, superAdmin], async (req, res) => {
   let { name, thumbnailUrl, systemPrompt, requiredCsvHeaders } = req.body;
 
   // If requiredCsvHeaders is a string, split it into an array
@@ -61,11 +62,6 @@ router.put('/templates/:id', [auth, admin], async (req, res) => {
   try {
     let template = await Template.findById(req.params.id);
     if (!template) return res.status(404).json({ msg: 'Template not found' });
-
-    // Check ownership
-    if (template.addedBy.toString() !== req.user.id) {
-      return res.status(403).json({ msg: 'Not authorized to edit this template' });
-    }
 
     template.name = name || template.name;
     template.thumbnailUrl = thumbnailUrl || template.thumbnailUrl;
@@ -81,17 +77,12 @@ router.put('/templates/:id', [auth, admin], async (req, res) => {
 });
 
 // @route   DELETE api/admin/templates/:id
-// @desc    Delete a template (only if owner)
-// @access  Admin
-router.delete('/templates/:id', [auth, admin], async (req, res) => {
+// @desc    Delete a template
+// @access  SuperAdmin
+router.delete('/templates/:id', [auth, superAdmin], async (req, res) => {
   try {
     let template = await Template.findById(req.params.id);
     if (!template) return res.status(404).json({ msg: 'Template not found' });
-
-    // Check ownership
-    if (template.addedBy.toString() !== req.user.id) {
-      return res.status(403).json({ msg: 'Not authorized to delete this template' });
-    }
 
     await template.deleteOne();
     res.json({ msg: 'Template removed' });
@@ -108,7 +99,19 @@ router.delete('/templates/:id', [auth, admin], async (req, res) => {
 // @access  Admin
 router.get('/users', [auth, admin], async (req, res) => {
   try {
-    const users = await User.find().select('-password').sort({ createdAt: -1 });
+    const requestingUser = await User.findById(req.user.id);
+    
+    let query = {};
+    
+    if (requestingUser.role === 'superadmin') {
+      // Superadmin can see everyone
+      query = {};
+    } else {
+      // Regular admin cannot see superadmin accounts
+      query = { role: { $in: ['user', 'admin'] } };
+    }
+
+    const users = await User.find(query).select('-password').sort({ createdAt: -1 });
     res.json(users);
   } catch (err) {
     console.error(err.message);
@@ -118,11 +121,23 @@ router.get('/users', [auth, admin], async (req, res) => {
 
 // @route   POST api/admin/users
 // @desc    Create a new user or admin
-// @access  Admin
+// @access  Admin/SuperAdmin
 router.post('/users', [auth, admin], async (req, res) => {
   const { email, password, role } = req.body;
 
   try {
+    // Only superadmin can create admin or superadmin accounts
+    const requestingUser = await User.findById(req.user.id);
+    
+    if ((role === 'admin' || role === 'superadmin') && requestingUser.role !== 'superadmin') {
+      return res.status(403).json({ msg: 'Only Super Admins can create admin or super admin accounts.' });
+    }
+
+    // Prevent creating superadmin if requester is not superadmin (double check)
+    if (role === 'superadmin' && requestingUser.role !== 'superadmin') {
+      return res.status(403).json({ msg: 'Only Super Admins can create other Super Admins.' });
+    }
+
     let user = await User.findOne({ email });
     if (user) {
       return res.status(400).json({ msg: 'User already exists' });
@@ -153,15 +168,29 @@ router.post('/users', [auth, admin], async (req, res) => {
 // @access  Admin
 router.delete('/users/:id', [auth, admin], async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).json({ msg: 'User not found' });
+    const requestingUser = await User.findById(req.user.id);
+    const userToDelete = await User.findById(req.params.id);
+    
+    if (!userToDelete) {
+      return res.status(404).json({ msg: 'User not found' });
+    }
 
     // Prevent deleting self
-    if (user._id.toString() === req.user.id) {
+    if (userToDelete._id.toString() === req.user.id) {
       return res.status(400).json({ msg: 'Cannot delete yourself' });
     }
 
-    await user.deleteOne();
+    // Regular admin cannot delete superadmin accounts
+    if (requestingUser.role !== 'superadmin' && userToDelete.role === 'superadmin') {
+      return res.status(403).json({ msg: 'You do not have permission to delete a Super Admin account.' });
+    }
+
+    // Regular admin cannot delete other admin accounts either
+    if (requestingUser.role !== 'superadmin' && userToDelete.role === 'admin') {
+      return res.status(403).json({ msg: 'Only Super Admins can delete Admin accounts.' });
+    }
+
+    await userToDelete.deleteOne();
     res.json({ msg: 'User removed' });
   } catch (err) {
     console.error(err.message);

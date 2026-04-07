@@ -13,12 +13,18 @@ const baseNavItems = [
 
 const Sidebar = () => {
   const user = JSON.parse(localStorage.getItem('user'));
-  const isAdmin = user && user.role === 'admin';
+  const role = user?.role;
+  const isAdmin = role === 'admin' || role === 'superadmin';
+  const isSuperAdmin = role === 'superadmin';
 
   const navItems = [...baseNavItems];
-  if (isAdmin) {
-    navItems.push({ href: '/admin/templates', label: 'Admin Templates', icon: FileText });
+  
+  if (isSuperAdmin) {
+    navItems.push({ href: '/admin/templates', label: 'AI Templates', icon: FileText });
     navItems.push({ href: '/admin/static-templates', label: 'Static Templates', icon: FileCode });
+    navItems.push({ href: '/admin/users', label: 'User Management', icon: Users });
+  } else if (isAdmin) {
+    // Regular admin can only see user management, not templates
     navItems.push({ href: '/admin/users', label: 'User Management', icon: Users });
   }
   return (
