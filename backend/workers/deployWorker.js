@@ -351,13 +351,50 @@ const worker = new Worker('deploy-queue', async (job) => {
   }
 }, { connection });
 
-worker.on('completed', (job, result) => {
+worker.on('completed', async (job, result) => {
   console.log(`Job ${job.id} completed:`, result);
+  try {
+    const { campaignId } = job.data;
+    if (!campaignId) return;
+
+    const Campaign = require('../models/Campaign');
+    const campaign = await Campaign.findByIdAndUpdate(
+      campaignId,
+      { $inc: { completedJobs: 1 } },
+      { new: true }
+    );
+
+    if (campaign && (campaign.completedJobs + campaign.failedJobs) >= campaign.totalJobs && campaign.totalJobs > 0) {
+      await Campaign.findByIdAndUpdate(campaignId, { status: 'completed' });
+      console.log(`[CAMPAIGN] Campaign ${campaignId} marked as completed`);
+    }
+  } catch (err) {
+    console.error('[CAMPAIGN] Failed to update campaign progress:', err.message);
+  }
 });
 
-worker.on('failed', (job, err) => {
+worker.on('failed', async (job, err) => {
   console.log(`Job ${job.id} failed:`, err.message);
+  try {
+    const { campaignId } = job.data;
+    if (!campaignId) return;
+
+    const Campaign = require('../models/Campaign');
+    const campaign = await Campaign.findByIdAndUpdate(
+      campaignId,
+      { $inc: { failedJobs: 1 } },
+      { new: true }
+    );
+
+    if (campaign && (campaign.completedJobs + campaign.failedJobs) >= campaign.totalJobs && campaign.totalJobs > 0) {
+      await Campaign.findByIdAndUpdate(campaignId, { status: 'completed' });
+      console.log(`[CAMPAIGN] Campaign ${campaignId} marked as completed (with some failures)`);
+    }
+  } catch (err) {
+    console.error('[CAMPAIGN] Failed to update campaign failure count:', err.message);
+  }
 });
+
 
 async function generateFromStaticTemplate(staticTemplate, csvRow, model) {
   // Step 1 — hydrate the prompt with CSV values
@@ -507,12 +544,49 @@ const staticWorker = new Worker('static-deploy-queue', async (job) => {
   }
 }, { connection });
 
-staticWorker.on('completed', (job, result) => {
+staticWorker.on('completed', async (job, result) => {
   console.log(`Static job ${job.id} completed:`, result);
+  try {
+    const { campaignId } = job.data;
+    if (!campaignId) return;
+
+    const Campaign = require('../models/Campaign');
+    const campaign = await Campaign.findByIdAndUpdate(
+      campaignId,
+      { $inc: { completedJobs: 1 } },
+      { new: true }
+    );
+
+    if (campaign && (campaign.completedJobs + campaign.failedJobs) >= campaign.totalJobs && campaign.totalJobs > 0) {
+      await Campaign.findByIdAndUpdate(campaignId, { status: 'completed' });
+      console.log(`[CAMPAIGN] Static Campaign ${campaignId} marked as completed`);
+    }
+  } catch (err) {
+    console.error('[CAMPAIGN] Failed to update static campaign progress:', err.message);
+  }
 });
 
-staticWorker.on('failed', (job, err) => {
+staticWorker.on('failed', async (job, err) => {
   console.log(`Static job ${job.id} failed:`, err.message);
+  try {
+    const { campaignId } = job.data;
+    if (!campaignId) return;
+
+    const Campaign = require('../models/Campaign');
+    const campaign = await Campaign.findByIdAndUpdate(
+      campaignId,
+      { $inc: { failedJobs: 1 } },
+      { new: true }
+    );
+
+    if (campaign && (campaign.completedJobs + campaign.failedJobs) >= campaign.totalJobs && campaign.totalJobs > 0) {
+      await Campaign.findByIdAndUpdate(campaignId, { status: 'completed' });
+      console.log(`[CAMPAIGN] Static Campaign ${campaignId} marked as completed (with some failures)`);
+    }
+  } catch (err) {
+    console.error('[CAMPAIGN] Failed to update static campaign failure count:', err.message);
+  }
 });
+
 
 module.exports = { deployQueue, staticDeployQueue };

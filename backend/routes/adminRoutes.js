@@ -198,4 +198,72 @@ router.delete('/users/:id', [auth, admin], async (req, res) => {
   }
 });
 
+// @route   GET api/admin/users/:id/overview
+// @desc    Get comprehensive overview of a specific user
+// @access  Admin/SuperAdmin
+router.get('/users/:id/overview', [auth, admin], async (req, res) => {
+  try {
+    const requestingUser = await User.findById(req.user.id);
+    const targetUser = await User.findById(req.params.id).select('-password');
+
+    if (!targetUser) {
+      return res.status(404).json({ msg: 'User not found' });
+    }
+
+    // Regular admin cannot view superadmin data
+    if (requestingUser.role !== 'superadmin' && targetUser.role === 'superadmin') {
+      return res.status(403).json({ msg: 'Access denied.' });
+    }
+
+    const userId = targetUser._id;
+
+    const [
+      credentials,
+      domains,
+      websites,
+      staticWebsites,
+      totalWebsitesLive,
+      totalWebsitesFailed,
+      totalWebsitesPending,
+      totalStaticLive,
+      totalStaticFailed,
+      totalStaticPending,
+    ] = await Promise.all([
+      require('../models/Credential').find({ userId }).select('-accessKey -secretKey -netlifyAccessToken -accountId').lean(),
+      require('../models/Domain').find({ userId }).lean(),
+      require('../models/Website').find({ userId }).sort({ createdAt: -1 }).select('productName status url createdAt platform subdomain domain').lean(),
+      require('../models/StaticWebsite').find({ userId }).sort({ createdAt: -1 }).select('productName status url createdAt platform subdomain domain staticTemplateId').lean(),
+      require('../models/Website').countDocuments({ userId, status: 'Live' }),
+      require('../models/Website').countDocuments({ userId, status: 'Failed' }),
+      require('../models/Website').countDocuments({ userId, status: 'Pending' }),
+      require('../models/StaticWebsite').countDocuments({ userId, status: 'Live' }),
+      require('../models/StaticWebsite').countDocuments({ userId, status: 'Failed' }),
+      require('../models/StaticWebsite').countDocuments({ userId, status: 'Pending' }),
+    ]);
+
+    res.json({
+      user: targetUser,
+      stats: {
+        totalWebsitesLive,
+        totalWebsitesFailed,
+        totalWebsitesPending,
+        totalWebsites: websites.length,
+        totalStaticLive,
+        totalStaticFailed,
+        totalStaticPending,
+        totalStaticWebsites: staticWebsites.length,
+        totalCredentials: credentials.length,
+        totalDomains: domains.length,
+      },
+      credentials,
+      domains,
+      websites,
+      staticWebsites,
+    });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
 module.exports = router;

@@ -7,7 +7,6 @@ pnpm-debug.log*
 
 # Production builds
 /frontend/dist/
-/frontend/.vite/
 /backend/build/
 /backend/node_modules/
 /backend/.env
@@ -125,3 +124,14 @@ docker-compose.override.yml
 # package-lock.json
 # yarn.lock
 # pnpm-lock.yaml
+
+# Temporary CSV upload files
+/tmp/
+tmp/
+/backend/tmp/
+
+# Vite cache
+.vite/
+frontend/.vite/
+frontend/.vite
+**/.vite/

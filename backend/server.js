@@ -3,6 +3,8 @@ const dotenv = require('dotenv');
 const cors = require('cors');
 const helmet = require('helmet');
 const connectDB = require('./config/db');
+const campaignUploadRoutes = require('./routes/campaignUploadRoutes');
+
 
 dotenv.config();
 
@@ -30,11 +32,18 @@ app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/domains', require('./routes/domainRoutes'));
 app.use('/api/static-templates', require('./routes/staticTemplateRoutes'));
 app.use('/api/static-websites', require('./routes/staticWebsiteRoutes'));
+app.use('/api/campaign-upload', campaignUploadRoutes);
+
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'Server is running' });
 });
 
+// Workers
+require('./workers/deployWorker');
+require('./workers/csvProcessorWorker');
+
 const PORT = process.env.PORT || 5001;
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
