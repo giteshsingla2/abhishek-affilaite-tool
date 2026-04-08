@@ -9,7 +9,8 @@ const Credential = require('../models/Credential');
 const Domain = require('../models/Domain');
 const { ensureUploadDir, CSV_UPLOAD_DIR } = require('../utils/ensureUploadDir');
 const { csvProcessorQueue } = require('../workers/csvProcessorWorker');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
+
 
 // Configure multer for CSV file uploads
 const storage = multer.diskStorage({
@@ -18,7 +19,8 @@ const storage = multer.diskStorage({
         cb(null, uploadDir);
     },
     filename: (req, file, cb) => {
-        const uniqueName = `${uuidv4()}-${Date.now()}.csv`;
+        const uniqueName = `${randomUUID()}-${Date.now()}.csv`;
+
         cb(null, uniqueName);
     },
 });

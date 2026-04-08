@@ -346,10 +346,11 @@ const CreateCampaign = () => {
                   className={`px-4 py-2 rounded-lg border border-white/10 ${step === 3 ? 'bg-white/10' : 'bg-transparent hover:bg-white/5'}`}
                   onClick={goToStep3}
                   type="button"
-                  disabled={!csvData.length || !selectedTemplate || invalidCount > 0}
+                  disabled={!csvFile || !selectedTemplate}
                 >
                   3. Deployment
                 </button>
+
               </div>
             </div>
           </GlassCard>
