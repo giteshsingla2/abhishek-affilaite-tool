@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import GlassCard from '../components/GlassCard';
 import Input from '../components/Input';
-import { UserPlus, Trash2, Shield, User } from 'lucide-react';
+import { UserPlus, Trash2, Shield, User, Eye } from 'lucide-react';
 
 const AdminUsers = () => {
   const [users, setUsers] = useState([]);
@@ -14,6 +15,7 @@ const AdminUsers = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const navigate = useNavigate();
 
   const currentUser = JSON.parse(localStorage.getItem('user'));
   const isSuperAdmin = currentUser?.role === 'superadmin';
@@ -177,13 +179,22 @@ const AdminUsers = () => {
                           </span>
                         </td>
                         <td className="py-4 px-4 text-right">
-                          <button
-                            onClick={() => deleteUser(u._id)}
-                            className="p-2 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors"
-                            title="Delete User"
-                          >
-                            <Trash2 size={18} />
-                          </button>
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => navigate(`/admin/users/${u._id}/overview`)}
+                              className="p-2 hover:bg-purple-500/20 text-purple-400 rounded-lg transition-colors"
+                              title="View User Details"
+                            >
+                              <Eye size={18} />
+                            </button>
+                            <button
+                              onClick={() => deleteUser(u._id)}
+                              className="p-2 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors"
+                              title="Delete User"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}

@@ -12,6 +12,7 @@ import Domains from './pages/Domains';
 import AdminTemplates from './pages/AdminTemplates';
 import AdminStaticTemplates from './pages/AdminStaticTemplates';
 import AdminUsers from './pages/AdminUsers';
+import AdminUserOverview from './pages/AdminUserOverview';
 import PrivateRoute from './routing/PrivateRoute';
 import Layout from './components/Layout';
 
@@ -62,6 +63,7 @@ function App() {
         <Route path="/admin/templates" element={<SuperAdminRoute><Layout><AdminTemplates /></Layout></SuperAdminRoute>} />
         <Route path="/admin/static-templates" element={<SuperAdminRoute><Layout><AdminStaticTemplates /></Layout></SuperAdminRoute>} />
         <Route path="/admin/users" element={<AdminRoute><Layout><AdminUsers /></Layout></AdminRoute>} />
+        <Route path="/admin/users/:id/overview" element={<AdminRoute><Layout><AdminUserOverview /></Layout></AdminRoute>} />
       </Routes>
     </Router>
   );

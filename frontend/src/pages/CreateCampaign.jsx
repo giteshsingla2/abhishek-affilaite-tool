@@ -1,7 +1,9 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import Papa from 'papaparse';
 import axios from 'axios';
 import GlassCard from '../components/GlassCard';
+import { CheckCircle } from 'lucide-react';
+import CampaignStatus from '../components/CampaignStatus';
+
 
 const MAX_PREVIEW_ROWS = 30;
 
@@ -42,9 +44,10 @@ const CreateCampaign = () => {
   const [selectedModel, setSelectedModel] = useState(AVAILABLE_MODELS[0].id);
 
   // Step 2: CSV Upload
-  const [csvData, setCsvData] = useState([]);
-  const [csvHeaders, setCsvHeaders] = useState([]);
+  const [csvFile, setCsvFile] = useState(null);
+  const [csvFileName, setCsvFileName] = useState('');
   const [parseError, setParseError] = useState('');
+
 
   // Step 3: Deployment
   const [platform, setPlatform] = useState('aws_s3');
@@ -71,82 +74,18 @@ const CreateCampaign = () => {
   const [submitError, setSubmitError] = useState('');
   const [submitResult, setSubmitResult] = useState(null);
 
-  const previewRows = useMemo(() => csvData.slice(0, MAX_PREVIEW_ROWS), [csvData]);
-
-  const validateRow = useCallback((row) => {
-    if (!selectedTemplate) return { isValid: false, missing: [] };
-    const missing = selectedTemplate.requiredCsvHeaders.filter((f) => String(row?.[f] || '').trim() === '');
-    return { isValid: missing.length === 0, missing };
-  }, [selectedTemplate]);
-
-  const invalidCount = useMemo(() => {
-    if (!selectedTemplate) return 0;
-    return csvData.reduce((count, row) => {
-      const v = validateRow(row);
-      return count + (v.isValid ? 0 : 1);
-    }, 0);
-  }, [csvData, validateRow, selectedTemplate]);
-
-  const parseCsvFile = (file) => {
-    setParseError('');
-    setSubmitError('');
-    setSubmitResult(null);
-    setCsvData([]);
-    setCsvHeaders([]);
-
-    if (!selectedTemplate) {
-      setParseError('Please select a template before uploading a file.');
-      return;
-    }
-
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      transformHeader: (h) => (h || '').trim(),
-      complete: (results) => {
-        if (results.errors && results.errors.length) {
-          setParseError(results.errors[0].message || 'Failed to parse CSV');
-          return;
-        }
-
-        const fields = (results.meta?.fields || []).map((f) => String(f || '').trim());
-        const required = mode === 'static' 
-          ? [...(selectedTemplate.requiredCsvHeaders || []), 'sub_domain', 'domain'] 
-          : (selectedTemplate.requiredCsvHeaders || []);
-        
-        const missingHeaders = required.filter((h) => !fields.includes(h));
-
-        if (missingHeaders.length) {
-          setParseError(`CSV is missing required columns: ${missingHeaders.join(', ')}.`);
-          return;
-        }
-
-        const data = (results.data || []).filter((r) => Object.values(r).some((v) => String(v || '').trim() !== ''));
-
-        if (!data.length) {
-          setParseError('CSV file is empty or contains no data.');
-          return;
-        }
-
-        setCsvHeaders(fields);
-        setCsvData(data);
-      },
-    });
-  };
-
   const onFileChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    parseCsvFile(file);
+    setParseError('');
+    if (!file.name.endsWith('.csv')) {
+      setParseError('Please upload a valid CSV file');
+      return;
+    }
+    setCsvFile(file);
+    setCsvFileName(file.name);
   };
 
-  const updateCell = (rowIndex, key, value) => {
-    setCsvData((prev) => {
-      const next = [...prev];
-      next[rowIndex] = { ...next[rowIndex], [key]: value };
-      return next;
-    });
-  };
 
   const fetchTemplates = useCallback(async () => {
     setLoadingTemplates(true);
@@ -275,12 +214,8 @@ const CreateCampaign = () => {
   };
 
   const goToStep3 = async () => {
-    if (!csvData.length) {
-      setParseError('Please upload a valid CSV file to continue.');
-      return;
-    }
-    if (invalidCount > 0) {
-      setParseError('Please fix the invalid rows before proceeding.');
+    if (!csvFile) {
+      setParseError('Please upload a CSV file to continue.');
       return;
     }
     setParseError('');
@@ -292,6 +227,7 @@ const CreateCampaign = () => {
     setStep(3);
   };
 
+
   const submitCampaign = async () => {
     setSubmitting(true);
     setSubmitError('');
@@ -301,34 +237,36 @@ const CreateCampaign = () => {
       const token = localStorage.getItem('token');
       const selectedDomain = domains.find(d => d._id === domainId);
 
-      const payload = {
-        campaignName,
-        [mode === 'static' ? 'staticTemplateId' : 'templateId']: selectedTemplate?._id,
-        model: mode === 'static' ? 'google/gemini-2.0-flash-001' : selectedModel,
-        platformConfig: {
-          platform,
-          credentialId: platform === 'custom_domain' ? undefined : credentialId,
-          domainId: platform === 'custom_domain' && !useDynamicDomain ? domainId : undefined,
-          domainName: platform === 'custom_domain' && !useDynamicDomain ? selectedDomain?.domain : undefined,
-          useDynamicDomain: platform === 'custom_domain' ? useDynamicDomain : undefined,
-          bucketName,
-          rootFolder,
-        },
-        csvData,
-      };
+      const formData = new FormData();
+      formData.append('csvFile', csvFile);
+      formData.append('campaignName', campaignName);
+      formData.append('campaignType', mode);
+      formData.append('platform', platform);
+      formData.append('model', mode === 'static' ? 'google/gemini-2.0-flash-001' : selectedModel);
 
-      const endpoint = mode === 'static' ? '/api/campaigns/start-static' : '/api/campaigns/start';
-      console.log(`[DEBUG] Submitting ${mode} campaign with payload:`, payload);
-      const res = await axios.post(
-        endpoint,
-        payload,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'x-auth-token': token,
-          },
+      if (mode === 'static') {
+        formData.append('staticTemplateId', selectedTemplate?._id);
+      } else {
+        formData.append('templateId', selectedTemplate?._id);
+      }
+
+      if (platform !== 'custom_domain') {
+        formData.append('credentialId', credentialId);
+        if (bucketName) formData.append('bucketName', bucketName);
+        if (rootFolder) formData.append('rootFolder', rootFolder);
+      } else {
+        formData.append('useDynamicDomain', useDynamicDomain);
+        if (!useDynamicDomain && selectedDomain) {
+          formData.append('domainName', selectedDomain.domain);
         }
-      );
+      }
+
+      const res = await axios.post('/api/campaign-upload/start', formData, {
+        headers: {
+          'x-auth-token': token,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
 
       setSubmitResult(res.data);
     } catch (err) {
@@ -337,6 +275,7 @@ const CreateCampaign = () => {
       setSubmitting(false);
     }
   };
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-purple-900 text-white p-6">
@@ -415,6 +354,7 @@ const CreateCampaign = () => {
             </div>
           </GlassCard>
         )}
+
 
         {step === 1 && (
           <GlassCard className="p-6">
@@ -513,29 +453,30 @@ const CreateCampaign = () => {
                 This template requires the following columns:
               </div>
               <div className="text-white/70 font-mono text-sm break-words mb-6">
-                [{ (mode === 'static' ? [...(selectedTemplate?.requiredCsvHeaders || []), 'sub_domain', 'domain'] : (selectedTemplate?.requiredCsvHeaders || [])).join(', ') }]
+                [{(mode === 'static'
+                  ? [...(selectedTemplate?.requiredCsvHeaders || []), 'sub_domain', 'domain']
+                  : (selectedTemplate?.requiredCsvHeaders || [])
+                ).join(', ')}]
               </div>
-              <div>
-                <input
-                  type="file"
-                  accept=".csv,text/csv"
-                  onChange={onFileChange}
-                  className="block w-full text-white file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-white/10 file:text-white hover:file:bg-white/20"
-                />
-              </div>
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                onChange={onFileChange}
+                className="block w-full text-white file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-white/10 file:text-white hover:file:bg-white/20"
+              />
+              {csvFileName && (
+                <div className="mt-4 flex items-center gap-2 text-green-400 bg-green-500/10 border border-green-500/20 rounded-lg px-4 py-3">
+                  <CheckCircle size={16} />
+                  <span className="text-sm font-medium">{csvFileName} selected and ready to upload</span>
+                </div>
+              )}
             </div>
 
             {parseError && <p className="mt-4 text-red-300">{parseError}</p>}
 
-            {!!csvData.length && (
+            {csvFile && (
               <div className="mt-6">
-                <div className="flex items-center justify-between gap-4 flex-wrap">
-                  <p className="text-white/80">
-                    Parsed <span className="font-semibold">{csvData.length}</span> rows. Previewing first {Math.min(csvData.length, MAX_PREVIEW_ROWS)}.
-                    {invalidCount > 0 && (
-                      <span className="ml-3 text-red-300">{invalidCount} invalid row(s) highlighted</span>
-                    )}
-                  </p>
+                <div className="flex justify-end">
                   <button
                     type="button"
                     onClick={goToStep3}
@@ -544,45 +485,11 @@ const CreateCampaign = () => {
                     Next: Deployment
                   </button>
                 </div>
-
-                <div className="mt-4 overflow-auto rounded-xl border border-white/10">
-                  <table className="min-w-full text-sm">
-                    <thead className="bg-white/5">
-                      <tr>
-                        {csvHeaders.map((c) => (
-                          <th key={c} className="text-left px-4 py-3 font-semibold text-white/90 whitespace-nowrap">
-                            {c}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {previewRows.map((r, idx) => {
-                        const { isValid } = validateRow(r);
-                        return (
-                          <tr
-                            key={idx}
-                            className={`border-t border-white/10 ${isValid ? '' : 'bg-red-500/15'}`}
-                          >
-                            {csvHeaders.map((c) => (
-                              <td key={c} className="px-2 py-2 text-white/80 align-top">
-                                <input
-                                  className="w-full bg-transparent border border-white/10 rounded-lg px-2 py-1 text-white/90 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                  value={String(r?.[c] ?? '')}
-                                  onChange={(e) => updateCell(idx, c, e.target.value)}
-                                />
-                              </td>
-                            ))}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
               </div>
             )}
           </GlassCard>
         )}
+
 
         {step === 3 && (
           <GlassCard className="p-6">
@@ -801,20 +708,26 @@ const CreateCampaign = () => {
               <button
                 type="button"
                 onClick={submitCampaign}
-                disabled={submitting || !csvData.length || !selectedTemplate || (platform !== 'custom_domain' && !credentialId) || (platform === 'custom_domain' && !useDynamicDomain && !domainId) || !campaignName}
+                disabled={submitting || !csvFile || !selectedTemplate || (platform !== 'custom_domain' && !credentialId) || (platform === 'custom_domain' && !useDynamicDomain && !domainId) || !campaignName}
                 className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 disabled:opacity-50"
               >
                 {submitting ? 'Submitting...' : 'Start Campaign'}
               </button>
+
             </div>
             {submitError && <p className="mt-4 text-red-300">{submitError}</p>}
 
-            {submitResult && (
-              <div className="mt-6 bg-white/5 border border-white/10 rounded-xl p-4">
-                <div className="text-white font-semibold">Result</div>
-                <div className="text-white/80 mt-2">{submitResult.message}</div>
+            {submitResult && submitResult.campaignId && (
+              <div className="mt-6">
+                <CampaignStatus
+                  campaignId={submitResult.campaignId}
+                  onComplete={(finalStatus) => {
+                    console.log('Campaign finished:', finalStatus);
+                  }}
+                />
               </div>
             )}
+
           </GlassCard>
         )}
       </div>
