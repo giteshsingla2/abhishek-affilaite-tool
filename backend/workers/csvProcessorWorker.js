@@ -1,8 +1,9 @@
 const { Worker, Queue } = require('bullmq');
 const fs = require('fs');
 const path = require('path');
-const csv = require('csv-parser');
+const { parse } = require('csv-parse');
 const dotenv = require('dotenv');
+
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const Campaign = require('../models/Campaign');
@@ -77,8 +78,12 @@ const csvProcessorWorker = new Worker('csv-processor-queue', async (job) => {
 
     await new Promise((resolve, reject) => {
         fs.createReadStream(csvFilePath)
-            .pipe(csv({
-                mapHeaders: ({ header }) => header.trim(),
+            .pipe(parse({
+                columns: true,
+                skip_empty_lines: true,
+                trim: true,
+                bom: true,
+                relax_column_count: true
             }))
             .on('data', (row) => {
                 // Validate required headers
@@ -121,6 +126,7 @@ const csvProcessorWorker = new Worker('csv-processor-queue', async (job) => {
             .on('end', resolve)
             .on('error', reject);
     });
+
 
     console.log(`[CSV_PROCESSOR] Campaign ${campaignId}: ${validRows.length} valid rows, ${failedRows.length} invalid rows`);
 
