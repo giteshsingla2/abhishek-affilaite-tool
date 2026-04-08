@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import axios from '../lib/axiosInstance';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, Globe, KeyRound, Globe2, FileText, Loader,

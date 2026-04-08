@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import axios from '../lib/axiosInstance';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Save, Trash2, Edit, X, Loader, Image as ImageIcon } from 'lucide-react';
 

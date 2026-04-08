@@ -3,10 +3,17 @@ const router = express.Router();
 const auth = require('../middleware/authMiddleware');
 const Domain = require('../models/Domain');
 
+const { body } = require('express-validator');
+const validate = require('../middleware/validate');
+
 // @route   POST api/domains
 // @desc    Add a new domain
 // @access  Private
-router.post('/', auth, async (req, res) => {
+router.post('/', [
+  auth,
+  body('domain').trim().notEmpty().withMessage('Domain is required').isFQDN().withMessage('Invalid domain format'),
+  validate
+], async (req, res) => {
   try {
     const { domain } = req.body;
     

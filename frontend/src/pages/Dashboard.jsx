@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import axios from '../lib/axiosInstance';
 import { Globe, Rocket, Database, Zap, RefreshCw, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import StatsCard from '../components/StatsCard';

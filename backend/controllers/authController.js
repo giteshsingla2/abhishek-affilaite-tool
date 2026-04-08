@@ -32,18 +32,20 @@ const register = async (req, res) => {
       },
     };
 
-    jwt.sign(
-      payload,
-      process.env.JWT_SECRET,
-      { expiresIn: 3600 },
-      (err, token) => {
-        if (err) throw err;
-        res.json({
-          token,
-          user: { id: user.id, email: user.email, role: user.role },
-        });
-      }
-    );
+    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '15m' });
+    const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET || 'refresh_secret_fallback', { expiresIn: '7d' });
+
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
+
+    res.json({
+      token,
+      user: { id: user.id, email: user.email, role: user.role },
+    });
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');
@@ -76,22 +78,55 @@ const login = async (req, res) => {
       },
     };
 
-    jwt.sign(
-      payload,
-      process.env.JWT_SECRET,
-      { expiresIn: 3600 },
-      (err, token) => {
-        if (err) throw err;
-        res.json({
-          token,
-          user: { id: user.id, email: user.email, role: user.role },
-        });
-      }
-    );
+    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '15m' });
+    const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET || 'refresh_secret_fallback', { expiresIn: '7d' });
+
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
+
+    res.json({
+      token,
+      user: { id: user.id, email: user.email, role: user.role },
+    });
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');
   }
 };
 
-module.exports = { register, login };
+const logout = (req, res) => {
+  res.clearCookie('refreshToken');
+  res.status(200).json({ msg: 'Logged out successfully' });
+};
+
+const refresh = (req, res) => {
+  const refreshToken = req.cookies.refreshToken;
+
+  if (!refreshToken) {
+    return res.status(401).json({ msg: 'No refresh token, authorization denied' });
+  }
+
+  try {
+    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET || 'refresh_secret_fallback');
+    
+    const payload = {
+      user: {
+        id: decoded.user.id,
+        role: decoded.user.role,
+      },
+    };
+
+    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '15m' });
+
+    res.json({ token });
+  } catch (err) {
+    console.error('[ERROR] Refresh token invalid:', err.message);
+    res.status(401).json({ msg: 'Token is not valid' });
+  }
+};
+
+module.exports = { register, login, logout, refresh };

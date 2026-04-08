@@ -7,10 +7,27 @@ const User = require('../models/User');
 const Template = require('../models/Template');
 const bcrypt = require('bcryptjs');
 
+const { body } = require('express-validator');
+const validate = require('../middleware/validate');
+
 // @route   POST api/admin/templates
 // @desc    Create a new template
 // @access  Admin
-router.post('/templates', [auth, superAdmin], async (req, res) => {
+router.post('/templates', [
+  auth,
+  superAdmin,
+  body('name').trim().notEmpty().withMessage('Name is required').isLength({ max: 200 }),
+  body('systemPrompt').notEmpty().withMessage('systemPrompt is required'),
+  body('requiredCsvHeaders').optional().custom((value) => {
+    if (Array.isArray(value)) {
+      if (!value.every(v => typeof v === 'string')) throw new Error('Array must contain only strings');
+      return true;
+    }
+    if (typeof value === 'string') return true;
+    throw new Error('Must be an array of strings or a comma-separated string');
+  }),
+  validate
+], async (req, res) => {
   let { name, thumbnailUrl, systemPrompt, requiredCsvHeaders } = req.body;
 
   // If requiredCsvHeaders is a string, split it into an array
@@ -51,7 +68,21 @@ router.get('/templates', [auth, superAdmin], async (req, res) => {
 // @route   PUT api/admin/templates/:id
 // @desc    Update a template
 // @access  SuperAdmin
-router.put('/templates/:id', [auth, superAdmin], async (req, res) => {
+router.put('/templates/:id', [
+  auth,
+  superAdmin,
+  body('name').trim().notEmpty().withMessage('Name is required').isLength({ max: 200 }),
+  body('systemPrompt').notEmpty().withMessage('systemPrompt is required'),
+  body('requiredCsvHeaders').optional().custom((value) => {
+    if (Array.isArray(value)) {
+      if (!value.every(v => typeof v === 'string')) throw new Error('Array must contain only strings');
+      return true;
+    }
+    if (typeof value === 'string') return true;
+    throw new Error('Must be an array of strings or a comma-separated string');
+  }),
+  validate
+], async (req, res) => {
   let { name, thumbnailUrl, systemPrompt, requiredCsvHeaders } = req.body;
 
   // If requiredCsvHeaders is a string, split it into an array
@@ -122,7 +153,14 @@ router.get('/users', [auth, admin], async (req, res) => {
 // @route   POST api/admin/users
 // @desc    Create a new user or admin
 // @access  Admin/SuperAdmin
-router.post('/users', [auth, admin], async (req, res) => {
+router.post('/users', [
+  auth,
+  admin,
+  body('email').isEmail().withMessage('Please include a valid email').normalizeEmail(),
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('role').isIn(['user', 'admin', 'superadmin']).withMessage('Invalid role'),
+  validate
+], async (req, res) => {
   const { email, password, role } = req.body;
 
   try {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Search, ExternalLink, Globe, Server, Trash2, FileCode } from 'lucide-react';
-import axios from 'axios';
+import axios from '../lib/axiosInstance';
 
 const GlassCard = ({ children, className = '' }) => (
   <motion.div

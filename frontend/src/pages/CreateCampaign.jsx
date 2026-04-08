@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import axios from '../lib/axiosInstance';
 import GlassCard from '../components/GlassCard';
 import { CheckCircle } from 'lucide-react';
 import CampaignStatus from '../components/CampaignStatus';

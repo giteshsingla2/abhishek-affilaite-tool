@@ -9,10 +9,21 @@ const StaticTemplate = require('../models/StaticTemplate');
 const Domain = require('../models/Domain');
 const { deployQueue, staticDeployQueue } = require('../workers/deployWorker');
 
+const { body } = require('express-validator');
+const validate = require('../middleware/validate');
+
 // @route   POST /api/campaigns/start
 // @desc    Save campaign + enqueue one job per csv row (Dynamic Headers Support)
 // @access  Private
-router.post('/start', auth, async (req, res) => {
+router.post('/start', [
+  auth,
+  body('campaignName').trim().notEmpty().withMessage('campaignName is required'),
+  body('templateId').isMongoId().withMessage('Invalid templateId format'),
+  body('platformConfig.platform').isIn(['aws_s3', 'digital_ocean', 'netlify', 'backblaze', 'cloudflare_r2', 'custom_domain']).withMessage('Invalid platform'),
+  body('platformConfig.credentialId').optional().isMongoId().withMessage('Invalid credentialId format'),
+  body('csvData').isArray({ min: 1 }).withMessage('csvData must be a non-empty array'),
+  validate
+], async (req, res) => {
   const { campaignName, templateId, platformConfig, csvData, model } = req.body;
 
   if (!campaignName || String(campaignName).trim() === '') {
@@ -158,7 +169,15 @@ router.post('/start', auth, async (req, res) => {
 // @route   POST /api/campaigns/start-static
 // @desc    Save campaign + enqueue one job per csv row for Static Templates
 // @access  Private
-router.post('/start-static', auth, async (req, res) => {
+router.post('/start-static', [
+  auth,
+  body('campaignName').trim().notEmpty().withMessage('campaignName is required'),
+  body('staticTemplateId').isMongoId().withMessage('Invalid staticTemplateId format'),
+  body('platformConfig.platform').isIn(['aws_s3', 'digital_ocean', 'netlify', 'backblaze', 'cloudflare_r2', 'custom_domain']).withMessage('Invalid platform'),
+  body('platformConfig.credentialId').optional().isMongoId().withMessage('Invalid credentialId format'),
+  body('csvData').isArray({ min: 1 }).withMessage('csvData must be a non-empty array'),
+  validate
+], async (req, res) => {
   const { campaignName, staticTemplateId, platformConfig, csvData, model } = req.body;
 
   if (!campaignName || String(campaignName).trim() === '') {

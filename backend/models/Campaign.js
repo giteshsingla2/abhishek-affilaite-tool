@@ -55,6 +55,7 @@ const CampaignSchema = new mongoose.Schema({
   completedJobs: { type: Number, default: 0 },
   failedJobs: { type: Number, default: 0 },
   failedRows: { type: [FailedRowSchema], default: [] },
+  errorMessage: { type: String, default: '' },
 
   createdAt: {
     type: Date,

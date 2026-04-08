@@ -5,6 +5,9 @@ const admin = require('../middleware/adminMiddleware');
 const superAdmin = require('../middleware/superAdminMiddleware');
 const StaticTemplate = require('../models/StaticTemplate');
 
+const { body } = require('express-validator');
+const validate = require('../middleware/validate');
+
 // @route   GET /api/static-templates
 // @desc    Get all templates (public)
 // @access  Public
@@ -42,7 +45,23 @@ router.get('/:id', async (req, res) => {
 // @route   POST /api/static-templates
 // @desc    Create new template
 // @access  Private (Super Admin)
-router.post('/', [auth, superAdmin], async (req, res) => {
+router.post('/', [
+  auth,
+  superAdmin,
+  body('name').trim().notEmpty().withMessage('Name is required').isLength({ max: 200 }),
+  body('category').isIn(['review', 'listicle', 'vsl', 'comparison', 'advertorial']).withMessage('Invalid category'),
+  body('htmlContent').notEmpty().withMessage('htmlContent is required'),
+  body('jsonPrompt').notEmpty().withMessage('jsonPrompt is required'),
+  body('requiredCsvHeaders').optional().custom((value) => {
+    if (Array.isArray(value)) {
+      if (!value.every(v => typeof v === 'string')) throw new Error('Array must contain only strings');
+      return true;
+    }
+    if (typeof value === 'string') return true;
+    throw new Error('Must be an array of strings or a comma-separated string');
+  }),
+  validate
+], async (req, res) => {
   const { name, category, thumbnailUrl, htmlContent, jsonPrompt, requiredCsvHeaders } = req.body;
 
   try {
@@ -67,7 +86,23 @@ router.post('/', [auth, superAdmin], async (req, res) => {
 // @route   PUT /api/static-templates/:id
 // @desc    Update template
 // @access  Private (Super Admin)
-router.put('/:id', [auth, superAdmin], async (req, res) => {
+router.put('/:id', [
+  auth,
+  superAdmin,
+  body('name').trim().notEmpty().withMessage('Name is required').isLength({ max: 200 }),
+  body('category').isIn(['review', 'listicle', 'vsl', 'comparison', 'advertorial']).withMessage('Invalid category'),
+  body('htmlContent').notEmpty().withMessage('htmlContent is required'),
+  body('jsonPrompt').notEmpty().withMessage('jsonPrompt is required'),
+  body('requiredCsvHeaders').optional().custom((value) => {
+    if (Array.isArray(value)) {
+      if (!value.every(v => typeof v === 'string')) throw new Error('Array must contain only strings');
+      return true;
+    }
+    if (typeof value === 'string') return true;
+    throw new Error('Must be an array of strings or a comma-separated string');
+  }),
+  validate
+], async (req, res) => {
   const { name, category, thumbnailUrl, htmlContent, jsonPrompt, requiredCsvHeaders } = req.body;
 
   try {

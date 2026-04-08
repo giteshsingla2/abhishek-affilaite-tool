@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import axios from '../lib/axiosInstance';
 import GlassCard from '../components/GlassCard';
 import Input from '../components/Input';
 import { UserPlus, Trash2, Shield, User, Eye } from 'lucide-react';

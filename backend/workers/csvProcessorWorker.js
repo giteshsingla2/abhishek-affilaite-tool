@@ -88,45 +88,59 @@ const csvProcessorWorker = new Worker('csv-processor-queue', async (job) => {
             }))
 
             .on('data', (row) => {
-                // Validate required headers
-                const missing = requiredHeaders.filter(
-                    h => !row[h] || String(row[h]).trim() === ''
-                );
+                try {
+                    // Validate required headers
+                    const missing = requiredHeaders.filter(
+                        h => !row[h] || String(row[h]).trim() === ''
+                    );
 
-                if (missing.length > 0) {
-                    failedRows.push({
-                        row,
-                        reason: `Missing required fields: ${missing.join(', ')}`,
-                    });
-                    return;
-                }
-
-                // Validate sub_domain exists
-                if (!row.sub_domain || String(row.sub_domain).trim() === '') {
-                    failedRows.push({
-                        row,
-                        reason: 'Missing sub_domain field',
-                    });
-                    return;
-                }
-
-                // Validate dynamic domain ownership
-                if (campaign.platform === 'custom_domain' && campaign.useDynamicDomain) {
-                    const cleanDomain = String(row.domain || '').trim().toLowerCase();
-                    if (!cleanDomain || !allowedDomains.has(cleanDomain)) {
+                    if (missing.length > 0) {
                         failedRows.push({
                             row,
-                            reason: `Domain not registered or not owned: ${row.domain}`,
+                            reason: `Missing required fields: ${missing.join(', ')}`,
                         });
                         return;
                     }
-                    row.domain = cleanDomain;
-                }
 
-                validRows.push(row);
+                    // Validate sub_domain exists
+                    if (!row.sub_domain || String(row.sub_domain).trim() === '') {
+                        failedRows.push({
+                            row,
+                            reason: 'Missing sub_domain field',
+                        });
+                        return;
+                    }
+
+                    // Validate dynamic domain ownership
+                    if (campaign.platform === 'custom_domain' && campaign.useDynamicDomain) {
+                        const cleanDomain = String(row.domain || '').trim().toLowerCase();
+                        if (!cleanDomain || !allowedDomains.has(cleanDomain)) {
+                            failedRows.push({
+                                row,
+                                reason: `Domain not registered or not owned: ${row.domain}`,
+                            });
+                            return;
+                        }
+                        row.domain = cleanDomain;
+                    }
+
+                    validRows.push(row);
+                } catch (err) {
+                    failedRows.push({ row, reason: 'Row processing error: ' + err.message });
+                }
             })
             .on('end', resolve)
-            .on('error', reject);
+            .on('error', async (err) => {
+                try {
+                    campaign.status = 'failed';
+                    campaign.errorMessage = err.message;
+                    campaign.failedRows = failedRows;
+                    await campaign.save();
+                } catch (saveErr) {
+                    console.error('[CSV_PROCESSOR] Failed to save error state:', saveErr.message);
+                }
+                reject(err);
+            });
     });
 
 

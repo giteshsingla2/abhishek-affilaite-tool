@@ -39,10 +39,21 @@ const upload = multer({
     limits: { fileSize: 50 * 1024 * 1024 }, // 50mb file size limit
 });
 
+const { body } = require('express-validator');
+const validate = require('../middleware/validate');
+
 // @route   POST /api/campaign-upload/start
 // @desc    Upload CSV file and start campaign processing
 // @access  Private
-router.post('/start', auth, upload.single('csvFile'), async (req, res) => {
+router.post('/start', auth, upload.single('csvFile'), [
+    body('campaignName').trim().notEmpty().withMessage('Campaign name is required').isLength({ max: 200 }),
+    body('campaignType').isIn(['ai', 'static']).withMessage('Campaign type must be ai or static'),
+    body('platform').isIn(['aws_s3', 'digital_ocean', 'netlify', 'backblaze', 'cloudflare_r2', 'custom_domain']).withMessage('Invalid platform'),
+    body('templateId').if(body('campaignType').equals('ai')).isMongoId().withMessage('Invalid Template ID format'),
+    body('staticTemplateId').if(body('campaignType').equals('static')).isMongoId().withMessage('Invalid Static Template ID format'),
+    body('credentialId').optional().isMongoId().withMessage('Invalid credentialId format'),
+    validate
+], async (req, res) => {
     try {
         const {
             campaignName,
@@ -167,7 +178,7 @@ router.post('/start', auth, upload.single('csvFile'), async (req, res) => {
 router.get('/:id/status', auth, async (req, res) => {
     try {
         const campaign = await Campaign.findById(req.params.id)
-            .select('name status campaignType totalJobs completedJobs failedJobs failedRows createdAt platform')
+            .select('name status campaignType totalJobs completedJobs failedJobs failedRows createdAt platform errorMessage')
             .lean();
 
         if (!campaign) {
@@ -191,6 +202,7 @@ router.get('/:id/status', auth, async (req, res) => {
             completedJobs: campaign.completedJobs,
             failedJobs: campaign.failedJobs,
             failedRowsCount: campaign.failedRows?.length || 0,
+            errorMessage: campaign.errorMessage || '',
             progress,
             isFinished: campaign.status === 'completed' || campaign.status === 'failed',
             createdAt: campaign.createdAt,

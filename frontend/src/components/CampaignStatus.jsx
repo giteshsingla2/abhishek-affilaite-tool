@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import axios from '../lib/axiosInstance';
 import { CheckCircle, XCircle, Loader, Download, AlertTriangle } from 'lucide-react';
 
 const CampaignStatus = ({ campaignId, onComplete }) => {
