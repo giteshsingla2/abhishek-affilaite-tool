@@ -83,8 +83,10 @@ const csvProcessorWorker = new Worker('csv-processor-queue', async (job) => {
                 skip_empty_lines: true,
                 trim: true,
                 bom: true,
-                relax_column_count: true
+                relax_column_count: true,
+                relax_quotes: true
             }))
+
             .on('data', (row) => {
                 // Validate required headers
                 const missing = requiredHeaders.filter(
