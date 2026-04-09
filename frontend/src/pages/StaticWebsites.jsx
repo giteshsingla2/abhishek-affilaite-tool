@@ -60,10 +60,13 @@ const StaticWebsites = () => {
   const [filteredWebsites, setFilteredWebsites] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ total: 0, pages: 1 });
+  const LIMIT = 50;
 
   useEffect(() => {
-    fetchWebsites();
-  }, []);
+    fetchWebsites(page);
+  }, [page]);
 
   useEffect(() => {
     const lowerTerm = searchTerm.toLowerCase();
@@ -76,20 +79,21 @@ const StaticWebsites = () => {
     setFilteredWebsites(filtered);
   }, [searchTerm, websites]);
 
-  const fetchWebsites = async () => {
+  const fetchWebsites = async (pageNum = 1) => {
+    setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('/api/static-websites?limit=100', {
+      const response = await axios.get(`/api/static-websites?page=${pageNum}&limit=${LIMIT}`, {
         headers: { 'x-auth-token': token }
       });
-      
-      // Handle both old array format and new paginated format for safety
-      const data = Array.isArray(response.data) 
-        ? response.data 
+      const data = Array.isArray(response.data)
+        ? response.data
         : (response.data.websites || []);
-      
       setWebsites(data);
       setFilteredWebsites(data);
+      if (response.data.pagination) {
+        setPagination(response.data.pagination);
+      }
     } catch (error) {
       console.error('Error fetching static websites:', error);
     } finally {
@@ -100,14 +104,17 @@ const StaticWebsites = () => {
   const handleDelete = async (websiteId) => {
     if (!window.confirm("Are you sure you want to delete this website record?")) return;
     try {
+      setWebsites(prev => prev.filter(w => w._id !== websiteId));
+      setFilteredWebsites(prev => prev.filter(w => w._id !== websiteId));
       const token = localStorage.getItem('token');
       await axios.delete(`/api/static-websites/${websiteId}`, {
         headers: { 'x-auth-token': token }
       });
-      setWebsites(prev => prev.filter(w => w._id !== websiteId));
+      fetchWebsites(page); // refetch current page to fix count
     } catch (error) {
       console.error("Delete failed", error);
       alert("Failed to delete website.");
+      fetchWebsites(page);
     }
   };
 
@@ -228,6 +235,34 @@ const StaticWebsites = () => {
               </div>
             )}
           </div>
+
+          {/* Pagination */}
+          {pagination.pages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-white/10">
+              <p className="text-sm text-gray-400">
+                Showing {(page - 1) * LIMIT + 1}–{Math.min(page * LIMIT, pagination.total)} of {pagination.total}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-sm text-white disabled:opacity-40 hover:bg-white/10 transition-colors"
+                >
+                  ← Prev
+                </button>
+                <span className="text-sm text-gray-400">
+                  Page {page} of {pagination.pages}
+                </span>
+                <button
+                  onClick={() => setPage(p => Math.min(pagination.pages, p + 1))}
+                  disabled={page === pagination.pages}
+                  className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-sm text-white disabled:opacity-40 hover:bg-white/10 transition-colors"
+                >
+                  Next →
+                </button>
+              </div>
+            </div>
+          )}
         </GlassCard>
       </div>
     </div>
