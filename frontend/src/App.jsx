@@ -13,6 +13,7 @@ import AdminTemplates from './pages/AdminTemplates';
 import AdminStaticTemplates from './pages/AdminStaticTemplates';
 import AdminUsers from './pages/AdminUsers';
 import AdminUserOverview from './pages/AdminUserOverview';
+import Campaigns from './pages/Campaigns';
 import PrivateRoute from './routing/PrivateRoute';
 import Layout from './components/Layout';
 
@@ -55,6 +56,7 @@ function App() {
         <Route path="/signup" element={<Signup />} />
         <Route path="/dashboard" element={<PrivateRoute><Layout><Dashboard /></Layout></PrivateRoute>} />
         <Route path="/credentials" element={<PrivateRoute><Layout><Credentials /></Layout></PrivateRoute>} />
+        <Route path="/campaigns" element={<PrivateRoute><Layout><Campaigns /></Layout></PrivateRoute>} />
         <Route path="/create-campaign" element={<PrivateRoute><Layout><CreateCampaign /></Layout></PrivateRoute>} />
         <Route path="/websites" element={<PrivateRoute><Layout><Websites /></Layout></PrivateRoute>} />
         <Route path="/static-websites" element={<PrivateRoute><Layout><StaticWebsites /></Layout></PrivateRoute>} />

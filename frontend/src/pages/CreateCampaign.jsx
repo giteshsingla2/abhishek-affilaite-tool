@@ -719,13 +719,18 @@ const CreateCampaign = () => {
             {submitError && <p className="mt-4 text-red-300">{submitError}</p>}
 
             {submitResult && submitResult.campaignId && (
-              <div className="mt-6">
+              <div className="mt-6 space-y-4">
                 <CampaignStatus
                   campaignId={submitResult.campaignId}
-                  onComplete={(finalStatus) => {
-                    console.log('Campaign finished:', finalStatus);
-                  }}
+                  onComplete={(finalStatus) => console.log('Campaign finished:', finalStatus)}
                 />
+                <p className="text-center text-sm text-gray-400">
+                  You can safely close this page.{' '}
+                  <a href="/campaigns" className="text-purple-400 hover:underline">
+                    View all campaigns
+                  </a>{' '}
+                  to check progress later.
+                </p>
               </div>
             )}
 

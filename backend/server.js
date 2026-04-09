@@ -80,6 +80,7 @@ app.use('/api/domains', require('./routes/domainRoutes'));
 app.use('/api/static-templates', require('./routes/staticTemplateRoutes'));
 app.use('/api/static-websites', require('./routes/staticWebsiteRoutes'));
 app.use('/api/campaign-upload', campaignUploadRoutes);
+app.use('/api/campaigns-list', require('./routes/campaignRoutes'));
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'Server is running' });
