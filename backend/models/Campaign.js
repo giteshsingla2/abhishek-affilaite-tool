@@ -40,10 +40,9 @@ const CampaignSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Template',
   },
-  staticTemplateId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'StaticTemplate',
-  },
+  staticTemplateId: [
+    { type: mongoose.Schema.Types.ObjectId, ref: 'StaticTemplate' }
+  ],
   bucketName: { type: String },
   rootFolder: { type: String },
   model: { type: String },

@@ -39,7 +39,8 @@ const CreateCampaign = () => {
 
   // Step 1: Template Selection
   const [templates, setTemplates] = useState([]);
-  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [selectedTemplates, setSelectedTemplates] = useState([]);
+  const [compatibleTemplateIds, setCompatibleTemplateIds] = useState(null); // null = no selection yet
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [selectedModel, setSelectedModel] = useState(AVAILABLE_MODELS[0].id);
 
@@ -204,8 +205,47 @@ const CreateCampaign = () => {
     }
   }, [step, fetchTemplates]);
 
+  const computeCompatibleIds = (anchorTemplate, allTemplates) => {
+    const anchorHeaders = [...(anchorTemplate.requiredCsvHeaders || [])].sort().join(',');
+    const compatibleSet = new Set(
+      allTemplates
+        .filter(t => [...(t.requiredCsvHeaders || [])].sort().join(',') === anchorHeaders)
+        .map(t => t._id)
+    );
+    return compatibleSet;
+  };
+
+  const handleTemplateClick = (template) => {
+    if (mode !== 'static') {
+      // AI mode: single select only
+      setSelectedTemplates([template]);
+      return;
+    }
+
+    const isSelected = selectedTemplates.some(t => t._id === template._id);
+
+    if (isSelected) {
+      // Deselect it
+      const remaining = selectedTemplates.filter(t => t._id !== template._id);
+      setSelectedTemplates(remaining);
+      if (remaining.length === 0) {
+        setCompatibleTemplateIds(null);
+      } else {
+        setCompatibleTemplateIds(computeCompatibleIds(remaining[0], templates));
+      }
+    } else {
+      // Select it — only allowed if compatible
+      if (compatibleTemplateIds !== null && !compatibleTemplateIds.has(template._id)) return;
+      setSelectedTemplates(prev => [...prev, template]);
+      if (selectedTemplates.length === 0) {
+        // First selection: compute compatibility set
+        setCompatibleTemplateIds(computeCompatibleIds(template, templates));
+      }
+    }
+  };
+
   const goToStep2 = () => {
-    if (!selectedTemplate) {
+    if (selectedTemplates.length === 0) {
       setSubmitError('Please select a template to continue.');
       return;
     }
@@ -245,9 +285,9 @@ const CreateCampaign = () => {
       formData.append('model', mode === 'static' ? 'google/gemini-2.0-flash-001' : selectedModel);
 
       if (mode === 'static') {
-        formData.append('staticTemplateId', selectedTemplate?._id);
+        formData.append('staticTemplateId', JSON.stringify(selectedTemplates.map(t => t._id)));
       } else {
-        formData.append('templateId', selectedTemplate?._id);
+        formData.append('templateId', selectedTemplates[0]?._id);
       }
 
       if (platform !== 'custom_domain') {
@@ -319,7 +359,7 @@ const CreateCampaign = () => {
           <GlassCard className="p-6">
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div className="flex items-center gap-4">
-                 <button onClick={() => { setStep(0); setMode(null); setSelectedTemplate(null); }} className="p-2 rounded-full hover:bg-white/10 text-gray-400 transition-colors">
+                 <button onClick={() => { setStep(0); setMode(null); setSelectedTemplates([]); setCompatibleTemplateIds(null); }} className="p-2 rounded-full hover:bg-white/10 text-gray-400 transition-colors">
                     <ArrowLeft size={20} />
                  </button>
                  <div className="text-white/80 font-medium">
@@ -338,7 +378,7 @@ const CreateCampaign = () => {
                   className={`px-4 py-2 rounded-lg border border-white/10 ${step === 2 ? 'bg-white/10' : 'bg-transparent hover:bg-white/5'}`}
                   onClick={goToStep2}
                   type="button"
-                  disabled={!selectedTemplate}
+                  disabled={selectedTemplates.length === 0}
                 >
                   2. Upload Data
                 </button>
@@ -346,7 +386,7 @@ const CreateCampaign = () => {
                   className={`px-4 py-2 rounded-lg border border-white/10 ${step === 3 ? 'bg-white/10' : 'bg-transparent hover:bg-white/5'}`}
                   onClick={goToStep3}
                   type="button"
-                  disabled={!csvFile || !selectedTemplate}
+                  disabled={!csvFile || selectedTemplates.length === 0}
                 >
                   3. Deployment
                 </button>
@@ -373,14 +413,27 @@ const CreateCampaign = () => {
 
             <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {templates.map((t) => {
-                const isSelected = selectedTemplate?._id === t._id;
+                const isSelected = selectedTemplates.some(s => s._id === t._id);
+                const isDisabled = mode === 'static' && compatibleTemplateIds !== null && !compatibleTemplateIds.has(t._id);
                 return (
                   <button
                     type="button"
                     key={t._id}
-                    onClick={() => setSelectedTemplate(t)}
-                    className={`text-left rounded-2xl border p-4 bg-white/5 hover:bg-white/10 transition ${isSelected ? 'border-purple-500 ring-2 ring-purple-500' : 'border-white/10'}`}
+                    onClick={() => !isDisabled && handleTemplateClick(t)}
+                    className={`relative text-left rounded-2xl border p-4 bg-white/5 transition ${
+                      isDisabled
+                        ? 'opacity-40 cursor-not-allowed border-white/10'
+                        : isSelected
+                        ? 'border-blue-500 ring-2 ring-blue-500 hover:bg-white/10'
+                        : 'border-white/10 hover:bg-white/10'
+                    }`}
                   >
+                    {/* Checkmark badge for selected (static mode) or single-select ring (AI mode) */}
+                    {isSelected && (
+                      <div className="absolute top-2 right-2 bg-blue-500 rounded-full p-0.5 z-10">
+                        <CheckCircle size={16} className="text-white" />
+                      </div>
+                    )}
                     <div className="w-full h-28 rounded-xl bg-white/5 border border-white/10 overflow-hidden mb-3">
                       {t.thumbnailUrl ? (
                         <img src={t.thumbnailUrl} alt={t.name} className="w-full h-full object-cover" />
@@ -403,7 +456,16 @@ const CreateCampaign = () => {
               })}
             </div>
 
-            {selectedTemplate && mode !== 'static' && (
+            {/* Info line for static multi-select */}
+            {mode === 'static' && (
+              <p className="text-sm text-white/50 mt-4">
+                {selectedTemplates.length > 0
+                  ? `${selectedTemplates.length} template(s) selected — templates with different CSV headers are dimmed`
+                  : 'Select one or more templates with matching CSV headers'}
+              </p>
+            )}
+
+            {selectedTemplates.length > 0 && mode !== 'static' && (
               <div className="mt-8 animate-fade-in-up">
                 <h3 className="text-xl font-bold mb-4">Select AI Model</h3>
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -435,7 +497,7 @@ const CreateCampaign = () => {
               <button
                 type="button"
                 onClick={goToStep2}
-                disabled={!selectedTemplate}
+                disabled={selectedTemplates.length === 0}
                 className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 disabled:opacity-50"
               >
                 Next: Upload Data
@@ -455,8 +517,8 @@ const CreateCampaign = () => {
               </div>
               <div className="text-white/70 font-mono text-sm break-words mb-6">
                 [{(mode === 'static'
-                  ? [...(selectedTemplate?.requiredCsvHeaders || []), 'sub_domain', 'domain']
-                  : (selectedTemplate?.requiredCsvHeaders || [])
+                  ? [...(selectedTemplates[0]?.requiredCsvHeaders || []), 'sub_domain', 'domain']
+                  : (selectedTemplates[0]?.requiredCsvHeaders || [])
                 ).join(', ')}]
               </div>
               <input
@@ -709,7 +771,7 @@ const CreateCampaign = () => {
               <button
                 type="button"
                 onClick={submitCampaign}
-                disabled={submitting || !csvFile || !selectedTemplate || (platform !== 'custom_domain' && !credentialId) || (platform === 'custom_domain' && !useDynamicDomain && !domainId) || !campaignName}
+                disabled={submitting || !csvFile || selectedTemplates.length === 0 || (platform !== 'custom_domain' && !credentialId) || (platform === 'custom_domain' && !useDynamicDomain && !domainId) || !campaignName}
                 className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 disabled:opacity-50"
               >
                 {submitting ? 'Submitting...' : 'Start Campaign'}

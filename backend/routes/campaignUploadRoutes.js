@@ -50,7 +50,7 @@ router.post('/start', auth, upload.single('csvFile'), [
     body('campaignType').isIn(['ai', 'static']).withMessage('Campaign type must be ai or static'),
     body('platform').isIn(['aws_s3', 'digital_ocean', 'netlify', 'backblaze', 'cloudflare_r2', 'custom_domain']).withMessage('Invalid platform'),
     body('templateId').if(body('campaignType').equals('ai')).isMongoId().withMessage('Invalid Template ID format'),
-    body('staticTemplateId').if(body('campaignType').equals('static')).isMongoId().withMessage('Invalid Static Template ID format'),
+    body('staticTemplateId').if(body('campaignType').equals('static')).notEmpty().withMessage('staticTemplateId is required for static campaigns'),
     body('credentialId').optional().isMongoId().withMessage('Invalid credentialId format'),
     validate
 ], async (req, res) => {
@@ -88,6 +88,25 @@ router.post('/start', auth, upload.single('csvFile'), [
         if (campaignType === 'static' && !staticTemplateId) {
             if (req.file) fs.unlinkSync(req.file.path);
             return res.status(400).json({ msg: 'staticTemplateId is required for static campaigns' });
+        }
+
+        // Normalize staticTemplateId to an array
+        let staticTemplateIds = null;
+        if (campaignType === 'static' && staticTemplateId) {
+            let parsed = staticTemplateId;
+            // If it's a JSON string (sent from FormData as JSON.stringify), parse it
+            if (typeof parsed === 'string' && parsed.startsWith('[')) {
+                try { parsed = JSON.parse(parsed); } catch (e) { /* keep as string */ }
+            }
+            // Wrap single value in array
+            staticTemplateIds = Array.isArray(parsed) ? parsed : [parsed];
+            // Validate each ID
+            const mongoose = require('mongoose');
+            const invalidIds = staticTemplateIds.filter(id => !mongoose.Types.ObjectId.isValid(id));
+            if (invalidIds.length > 0) {
+                if (req.file) fs.unlinkSync(req.file.path);
+                return res.status(400).json({ msg: `Invalid staticTemplateId(s): ${invalidIds.join(', ')}` });
+            }
         }
 
         if (!platform) {
@@ -138,7 +157,7 @@ router.post('/start', auth, upload.single('csvFile'), [
             credentialId: platform === 'custom_domain' ? null : credentialId,
             domainName: platform === 'custom_domain' ? domainName : undefined,
             templateId: campaignType === 'ai' ? templateId : undefined,
-            staticTemplateId: campaignType === 'static' ? staticTemplateId : undefined,
+            staticTemplateId: campaignType === 'static' ? staticTemplateIds : undefined,
             bucketName,
             rootFolder,
             model: model || process.env.OPENROUTER_MODEL,

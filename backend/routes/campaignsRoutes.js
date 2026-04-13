@@ -172,7 +172,7 @@ router.post('/start', [
 router.post('/start-static', [
   auth,
   body('campaignName').trim().notEmpty().withMessage('campaignName is required'),
-  body('staticTemplateId').isMongoId().withMessage('Invalid staticTemplateId format'),
+  body('staticTemplateId').notEmpty().withMessage('staticTemplateId is required'),
   body('platformConfig.platform').isIn(['aws_s3', 'digital_ocean', 'netlify', 'backblaze', 'cloudflare_r2', 'custom_domain']).withMessage('Invalid platform'),
   body('platformConfig.credentialId').optional().isMongoId().withMessage('Invalid credentialId format'),
   body('csvData').isArray({ min: 1 }).withMessage('csvData must be a non-empty array'),
@@ -186,6 +186,21 @@ router.post('/start-static', [
 
   if (!staticTemplateId) {
     return res.status(400).json({ msg: 'staticTemplateId is required' });
+  }
+
+  // Normalize staticTemplateId to an array
+  let staticTemplateIds;
+  {
+    let parsed = staticTemplateId;
+    if (typeof parsed === 'string' && parsed.startsWith('[')) {
+      try { parsed = JSON.parse(parsed); } catch (e) { /* keep as string */ }
+    }
+    staticTemplateIds = Array.isArray(parsed) ? parsed : [parsed];
+    const mongoose = require('mongoose');
+    const invalidIds = staticTemplateIds.filter(id => !mongoose.Types.ObjectId.isValid(id));
+    if (invalidIds.length > 0) {
+      return res.status(400).json({ msg: `Invalid staticTemplateId(s): ${invalidIds.join(', ')}` });
+    }
   }
 
   if (!platformConfig || !platformConfig.platform) {
@@ -203,8 +218,8 @@ router.post('/start-static', [
   const { platform, credentialId, bucketName, rootFolder, domainName, useDynamicDomain } = platformConfig;
 
   try {
-    // 1. Fetch Static Template
-    const staticTemplate = await StaticTemplate.findById(staticTemplateId);
+    // 1. Fetch first Static Template for validation
+    const staticTemplate = await StaticTemplate.findById(staticTemplateIds[0]);
     if (!staticTemplate) {
       return res.status(404).json({ msg: 'Static Template not found' });
     }
@@ -235,13 +250,14 @@ router.post('/start-static', [
       platform,
       credentialId: platform === 'custom_domain' ? null : credentialId,
       domainName: platform === 'custom_domain' ? domainName : undefined,
-      staticTemplateId,
+      staticTemplateId: staticTemplateIds,
       bucketName,
       rootFolder,
     });
 
-    // 4. Queue Jobs (to static-deploy-queue)
+    // 4. Queue Jobs (to static-deploy-queue) with round-robin template assignment
     let queued = 0;
+    const validRows = [];
     for (let i = 0; i < csvData.length; i++) {
       const row = csvData[i];
       if (!row || Object.keys(row).length === 0) continue;
@@ -258,10 +274,16 @@ router.post('/start-static', [
         row.domain = cleanDomain;
       }
 
+      validRows.push(row);
+    }
+
+    for (let i = 0; i < validRows.length; i++) {
+      const row = validRows[i];
+      const assignedTemplateId = staticTemplateIds[i % staticTemplateIds.length];
       await staticDeployQueue.add('static-deploy-job', {
         campaignMode: 'static_template',
         campaignId: campaign._id,
-        staticTemplateId,
+        staticTemplateId: assignedTemplateId,
         platform,
         credentialId: platform === 'custom_domain' ? null : credentialId,
         domainName: useDynamicDomain ? row.domain : domainName,

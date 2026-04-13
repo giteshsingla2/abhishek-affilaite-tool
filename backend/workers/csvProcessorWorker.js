@@ -48,13 +48,25 @@ const csvProcessorWorker = new Worker('csv-processor-queue', async (job) => {
     let templateDoc = null;
 
     if (campaign.campaignType === 'static') {
-        templateDoc = await StaticTemplate.findById(campaign.staticTemplateId);
-        if (!templateDoc) {
+        const templateIds = campaign.staticTemplateId;
+        if (!templateIds || templateIds.length === 0) {
+            campaign.status = 'failed';
+            campaign.errorMessage = 'No templates assigned to campaign';
+            await campaign.save();
+            throw new Error('No templates assigned to campaign');
+        }
+        // Fetch all templates
+        const staticTemplates = await StaticTemplate.find({ _id: { $in: templateIds } });
+        if (!staticTemplates || staticTemplates.length === 0) {
             campaign.status = 'failed';
             await campaign.save();
-            throw new Error(`StaticTemplate ${campaign.staticTemplateId} not found`);
+            throw new Error(`No StaticTemplates found for IDs: ${templateIds.join(', ')}`);
         }
+        // Use first template's headers for validation (they're guaranteed identical)
+        templateDoc = staticTemplates[0];
         requiredHeaders = templateDoc.requiredCsvHeaders || [];
+        // Store full list for later round-robin queuing
+        campaign._staticTemplates = staticTemplates;
     } else {
         templateDoc = await Template.findById(campaign.templateId);
         if (!templateDoc) {
@@ -165,12 +177,16 @@ const csvProcessorWorker = new Worker('csv-processor-queue', async (job) => {
     await campaign.save();
 
     // Queue individual deploy jobs
-    for (const row of validRows) {
+    for (let rowIndex = 0; rowIndex < validRows.length; rowIndex++) {
+        const row = validRows[rowIndex];
         if (campaign.campaignType === 'static') {
+            // Round-robin template assignment
+            const templateIds = campaign.staticTemplateId;
+            const assignedTemplateId = templateIds[rowIndex % templateIds.length];
             await staticDeployQueue.add('static-deploy-job', {
                 campaignMode: 'static_template',
                 campaignId: campaign._id,
-                staticTemplateId: campaign.staticTemplateId,
+                staticTemplateId: assignedTemplateId,
                 platform: campaign.platform,
                 credentialId: campaign.platform === 'custom_domain' ? null : campaign.credentialId,
                 domainName: campaign.useDynamicDomain ? row.domain : campaign.domainName,
