@@ -18,6 +18,13 @@ const { injectIntoTemplate } = require('../utils/templateInjector');
 
 const USER_SITES_BASE_DIR = process.env.USER_SITES_BASE_DIR || '/var/www/user_sites';
 
+// CONCURRENCY TUNING GUIDE:
+// - Netlify platform campaigns: keep at 5 max (Netlify rate limits)
+// - Monitor with: pm2 logs and check for 429 errors in output
+// - If seeing 429s frequently, reduce concurrency or increase backoff in callOpenRouterWithRetry
+const DEPLOY_CONCURRENCY = parseInt(process.env.DEPLOY_WORKER_CONCURRENCY || '15');
+const STATIC_CONCURRENCY = parseInt(process.env.STATIC_DEPLOY_WORKER_CONCURRENCY || '15');
+
 const connection = {
   host: process.env.REDIS_HOST || '127.0.0.1',
   port: process.env.REDIS_PORT || 6379,
@@ -187,6 +194,35 @@ const stripMarkdownCodeFences = (text) => {
     .trim();
 };
 
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+const callOpenRouterWithRetry = async (payload, headers, maxRetries = 3) => {
+  let lastError;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await axios.post(
+        'https://openrouter.ai/api/v1/chat/completions',
+        payload,
+        { headers, timeout: 60000 }
+      );
+      return response;
+    } catch (error) {
+      lastError = error;
+      const status = error.response?.status;
+      // Retry on rate limit (429) or server errors (5xx)
+      if (status === 429 || (status >= 500 && status < 600)) {
+        const backoff = attempt * 3000; // 3s, 6s, 9s
+        console.log(`[OPENROUTER] Attempt ${attempt} failed (${status}). Retrying in ${backoff}ms...`);
+        await sleep(backoff);
+        continue;
+      }
+      // Don't retry on 4xx client errors (bad request, auth failed etc)
+      throw error;
+    }
+  }
+  throw lastError;
+};
+
 const generateHtml = async (systemPrompt, row, model) => {
   const systemRole = "You are a Helpful AI Assistant who creates HTML Websites. Return only a valid complete HTML document — no markdown, no code fences, no explanations, no commentary before or after the HTML.";
 
@@ -211,19 +247,21 @@ const generateHtml = async (systemPrompt, row, model) => {
   const fullPrompt = dna + '\n\n' + finalHydratedPrompt;
 
   try {
-    const response = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
+    const payload = {
       model: model || process.env.OPENROUTER_MODEL,
       messages: [
         { role: 'system', content: systemRole },
         { role: 'user', content: fullPrompt },
       ],
-    }, {
-      headers: {
-        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'http://localhost:5173',
-      }
-    });
+    };
+
+    const headers = {
+      'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'http://localhost:5173',
+    };
+
+    const response = await callOpenRouterWithRetry(payload, headers);
 
     let htmlContent = response.data.choices[0].message.content;
     htmlContent = stripMarkdownCodeFences(htmlContent);
@@ -349,7 +387,7 @@ const worker = new Worker('deploy-queue', async (job) => {
     console.log(`[JOB_PROGRESS] ${job.id}: Website status updated to 'Failed'.`);
     throw error;
   }
-}, { connection });
+}, { connection, concurrency: DEPLOY_CONCURRENCY });
 
 worker.on('completed', async (job, result) => {
   console.log(`Job ${job.id} completed:`, result);
@@ -404,26 +442,24 @@ async function generateFromStaticTemplate(staticTemplate, csvRow, model) {
   }
 
   // Step 2 — call AI, ask for JSON only
-  const response = await axios.post(
-    'https://openrouter.ai/api/v1/chat/completions',
-    {
-      model: model || process.env.OPENROUTER_MODEL,
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a conversion copywriter. Return ONLY valid JSON. No markdown, no code fences, no explanation before or after.'
-        },
-        { role: 'user', content: prompt }
-      ]
-    },
-    {
-      headers: {
-        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'http://localhost:5173'
-      }
-    }
-  );
+  const payload = {
+    model: model || process.env.OPENROUTER_MODEL,
+    messages: [
+      {
+        role: 'system',
+        content: 'You are a conversion copywriter. Return ONLY valid JSON. No markdown, no code fences, no explanation before or after.'
+      },
+      { role: 'user', content: prompt }
+    ]
+  };
+
+  const headers = {
+    'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+    'Content-Type': 'application/json',
+    'HTTP-Referer': 'http://localhost:5173'
+  };
+
+  const response = await callOpenRouterWithRetry(payload, headers);
 
   // Step 3 — parse JSON
   let raw = response.data.choices[0].message.content;
@@ -542,7 +578,7 @@ const staticWorker = new Worker('static-deploy-queue', async (job) => {
     await staticWebsite.save();
     throw error;
   }
-}, { connection });
+}, { connection, concurrency: STATIC_CONCURRENCY });
 
 staticWorker.on('completed', async (job, result) => {
   console.log(`Static job ${job.id} completed:`, result);

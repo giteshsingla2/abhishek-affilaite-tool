@@ -19,6 +19,8 @@ const connection = {
 // Import existing queues
 const { deployQueue, staticDeployQueue } = require('./deployWorker');
 
+const CSV_CONCURRENCY = parseInt(process.env.CSV_PROCESSOR_CONCURRENCY || '3');
+
 const csvProcessorQueue = new Queue('csv-processor-queue', { connection });
 
 const csvProcessorWorker = new Worker('csv-processor-queue', async (job) => {
@@ -222,7 +224,7 @@ const csvProcessorWorker = new Worker('csv-processor-queue', async (job) => {
 
     return { totalJobs: validRows.length, failedRows: failedRows.length };
 
-}, { connection });
+}, { connection, concurrency: CSV_CONCURRENCY });
 
 csvProcessorWorker.on('completed', (job, result) => {
     console.log(`[CSV_PROCESSOR] Job ${job.id} completed:`, result);
