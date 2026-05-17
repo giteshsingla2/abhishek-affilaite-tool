@@ -10,7 +10,7 @@ pnpm-debug.log*
 /backend/build/
 /backend/node_modules/
 /backend/.env
-
+/backend/scripts/
 # Environment variables
 .env
 .env.local

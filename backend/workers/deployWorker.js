@@ -268,7 +268,7 @@ const generateHtml = async (systemPrompt, row, model) => {
 
     const headerCode = String(row.header_code || '').trim();
     if (headerCode) {
-      htmlContent = htmlContent.replace('</head>', `${headerCode}\n</head>`);
+      htmlContent = htmlContent.replace('</head>', '\n\n' + headerCode + '\n\n</head>');
     }
 
     return htmlContent;
@@ -372,7 +372,7 @@ const worker = new Worker('deploy-queue', async (job) => {
     if (result.siteId) {
       website.siteId = result.siteId;
     }
-    website.htmlContent = htmlContent;
+    website.htmlContent = ''; // Storage optimization: HTML is fetched live on-demand
     website.headerCode = String(row.header_code || '').trim();
     await website.save();
     console.log(`[JOB_PROGRESS] ${job.id}: Step 5 - Website updated successfully.`);
