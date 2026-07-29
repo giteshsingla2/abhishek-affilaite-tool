@@ -236,7 +236,7 @@ router.post('/:id/redeploy', auth, async (req, res) => {
 
     // --- CUSTOM DOMAIN (Local Server) ---
     if (platform === 'custom_domain') {
-      const domainName = campaign?.domainName;
+      const domainName = website.domain || campaign?.domainName;
       const subDomain = website.subdomain;
 
       if (domainName && subDomain) {
