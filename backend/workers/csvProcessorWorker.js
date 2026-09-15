@@ -10,6 +10,7 @@ const Campaign = require('../models/Campaign');
 const Template = require('../models/Template');
 const StaticTemplate = require('../models/StaticTemplate');
 const Domain = require('../models/Domain');
+const { validateSlug, normaliseDeployMode } = require('../utils/sitePath');
 
 const connection = {
     host: process.env.REDIS_HOST || '127.0.0.1',
@@ -86,9 +87,15 @@ const csvProcessorWorker = new Worker('csv-processor-queue', async (job) => {
         allowedDomains = new Set(userDomains.map(d => d.domain));
     }
 
+    // Normalise deploy mode once — used both for duplicate-key construction
+    // and for the job payload so workers don't need to re-read the campaign.
+    const deployMode = normaliseDeployMode(campaign.deployMode);
+
     // Read and process CSV row by row using streams
     const validRows = [];
     const failedRows = [];
+    // Track domain|slug pairs to detect rows that would overwrite each other on disk.
+    const seenTargets = new Set();
 
     await new Promise((resolve, reject) => {
         fs.createReadStream(csvFilePath)
@@ -116,14 +123,15 @@ const csvProcessorWorker = new Worker('csv-processor-queue', async (job) => {
                         return;
                     }
 
-                    // Validate sub_domain exists
-                    if (!row.sub_domain || String(row.sub_domain).trim() === '') {
-                        failedRows.push({
-                            row,
-                            reason: 'Missing sub_domain field',
-                        });
+                    // Validate and normalise sub_domain via shared helper.
+                    // This trims, lowercases and enforces DNS-label charset so
+                    // "Offer1" and "offer1" never create two records on one folder.
+                    const slugCheck = validateSlug(row.sub_domain);
+                    if (!slugCheck.ok) {
+                        failedRows.push({ row, reason: slugCheck.reason });
                         return;
                     }
+                    row.sub_domain = slugCheck.slug; // write back normalised value
 
                     // Validate dynamic domain ownership
                     if (campaign.platform === 'custom_domain' && campaign.useDynamicDomain) {
@@ -136,6 +144,24 @@ const csvProcessorWorker = new Worker('csv-processor-queue', async (job) => {
                             return;
                         }
                         row.domain = cleanDomain;
+                    }
+
+                    // Duplicate detection: two rows with identical domain+slug would
+                    // silently overwrite each other on disk.  Catch it here so the
+                    // second row lands in failedRows with a clear reason.
+                    if (campaign.platform === 'custom_domain') {
+                        const rowDomain = String(
+                            row.domain || campaign.domainName || ''
+                        ).trim().toLowerCase();
+                        const targetKey = `${rowDomain}|${row.sub_domain}`;
+                        if (seenTargets.has(targetKey)) {
+                            failedRows.push({
+                                row,
+                                reason: `Duplicate slug "${row.sub_domain}" for domain "${rowDomain}" — skipped to prevent overwrite`,
+                            });
+                            return;
+                        }
+                        seenTargets.add(targetKey);
                     }
 
                     validRows.push(row);
@@ -193,6 +219,7 @@ const csvProcessorWorker = new Worker('csv-processor-queue', async (job) => {
                 credentialId: campaign.platform === 'custom_domain' ? null : campaign.credentialId,
                 domainName: campaign.useDynamicDomain ? row.domain : campaign.domainName,
                 row,
+                deployMode,
                 bucketName: campaign.bucketName,
                 rootFolder: campaign.rootFolder,
                 model: campaign.model || process.env.OPENROUTER_MODEL,
@@ -205,6 +232,7 @@ const csvProcessorWorker = new Worker('csv-processor-queue', async (job) => {
                 domainName: campaign.useDynamicDomain ? row.domain : campaign.domainName,
                 templateId: campaign.templateId,
                 row,
+                deployMode,
                 bucketName: campaign.bucketName,
                 rootFolder: campaign.rootFolder,
                 model: campaign.model || process.env.OPENROUTER_MODEL,

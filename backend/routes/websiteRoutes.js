@@ -9,8 +9,7 @@ const Campaign = require('../models/Campaign');
 const Credential = require('../models/Credential');
 const { deleteFromS3, uploadToS3 } = require('../services/uploaders/s3Adapter');
 const { deleteFromNetlify, uploadToNetlify } = require('../services/uploaders/netlifyAdapter');
-
-const USER_SITES_BASE_DIR = process.env.USER_SITES_BASE_DIR || '/var/www/user_sites';
+const { buildSitePath, buildIndexPath, injectBaseHref } = require('../utils/sitePath');
 
 /**
  * Strips any previously injected tracking scripts wrapped in our custom
@@ -82,10 +81,18 @@ router.delete('/:id', auth, async (req, res) => {
       const subDomain = website.subdomain;
       
       if (domainName && subDomain) {
-        const localPath = path.join(USER_SITES_BASE_DIR, domainName, subDomain);
-        if (fs.existsSync(localPath)) {
-          fs.rmSync(localPath, { recursive: true, force: true });
-          console.log(`Deleted local folder: ${localPath}`);
+        try {
+          const localPath = buildSitePath({
+            domain: domainName,
+            slug: subDomain,
+            deployMode: website.deployMode,
+          });
+          if (fs.existsSync(localPath)) {
+            fs.rmSync(localPath, { recursive: true, force: true });
+            console.log(`Deleted local folder: ${localPath}`);
+          }
+        } catch (pathErr) {
+          console.error(`[DELETE] Could not build site path for deletion:`, pathErr.message);
         }
       }
     }
@@ -240,22 +247,36 @@ router.post('/:id/redeploy', auth, async (req, res) => {
       const subDomain = website.subdomain;
 
       if (domainName && subDomain) {
-        const localPath = path.join(USER_SITES_BASE_DIR, domainName, subDomain);
-        const indexPath = path.join(localPath, 'index.html');
+        try {
+          const indexPath = buildIndexPath({
+            domain: domainName,
+            slug: subDomain,
+            deployMode: website.deployMode,
+          });
+          const localDir = path.dirname(indexPath);
 
-        // Ensure directory exists
-        if (!fs.existsSync(localPath)) {
-          fs.mkdirSync(localPath, { recursive: true });
+          // Ensure directory exists
+          if (!fs.existsSync(localDir)) {
+            fs.mkdirSync(localDir, { recursive: true });
+          }
+
+          // Inject base href for subdirectory-mode sites before writing
+          const htmlToWrite = injectBaseHref(updatedHtmlContent, {
+            slug: subDomain,
+            deployMode: website.deployMode,
+          });
+
+          // Write updated HTML to file
+          fs.writeFileSync(indexPath, htmlToWrite);
+          console.log(`[REDEPLOY] Written to local path: ${indexPath}`);
+
+          deployResult = {
+            success: true,
+            url: website.url, // Keep the same URL
+          };
+        } catch (pathErr) {
+          return res.status(400).json({ msg: `Cannot build deployment path: ${pathErr.message}` });
         }
-
-        // Write updated HTML to file
-        fs.writeFileSync(indexPath, updatedHtmlContent);
-        console.log(`[REDEPLOY] Written to local path: ${indexPath}`);
-
-        deployResult = {
-          success: true,
-          url: website.url, // Keep the same URL
-        };
       } else {
         return res.status(400).json({ msg: 'Missing domain information for custom domain deployment' });
       }

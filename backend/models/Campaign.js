@@ -47,6 +47,11 @@ const CampaignSchema = new mongoose.Schema({
   rootFolder: { type: String },
   model: { type: String },
   useDynamicDomain: { type: Boolean, default: false },
+  deployMode: {
+    type: String,
+    enum: ['subdomain', 'subdirectory'],
+    default: 'subdomain',
+  },
 
   // CSV processing fields
   csvFilePath: { type: String, default: '' },

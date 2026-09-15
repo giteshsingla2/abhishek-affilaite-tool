@@ -10,8 +10,7 @@ const { uploadToNetlify } = require('../services/uploaders/netlifyAdapter');
 const { injectIntoTemplate } = require('../utils/templateInjector');
 const path = require('path');
 const fs = require('fs');
-
-const USER_SITES_BASE_DIR = process.env.USER_SITES_BASE_DIR || '/var/www/user_sites';
+const { buildIndexPath, buildSiteUrl, injectBaseHref } = require('../utils/sitePath');
 
 // @route   GET /api/static-websites
 // @desc    Get all static websites for logged in user
@@ -152,11 +151,22 @@ router.post('/:id/redeploy', auth, async (req, res) => {
         result = await uploadToNetlify(htmlToUpload, subDomain, credential);
         break;
       case 'custom_domain':
-        const sitePath = path.join(USER_SITES_BASE_DIR, targetDomain, subDomain);
         try {
-          fs.mkdirSync(sitePath, { recursive: true });
-          fs.writeFileSync(path.join(sitePath, 'index.html'), htmlToUpload);
-          result = { success: true, url: `http://${subDomain}.${targetDomain}` };
+          const htmlToWrite = injectBaseHref(htmlToUpload, {
+            slug: subDomain,
+            deployMode: website.deployMode,
+          });
+          const indexPath = buildIndexPath({
+            domain: targetDomain,
+            slug: subDomain,
+            deployMode: website.deployMode,
+          });
+          fs.mkdirSync(path.dirname(indexPath), { recursive: true });
+          fs.writeFileSync(indexPath, htmlToWrite);
+          result = {
+            success: true,
+            url: buildSiteUrl({ domain: targetDomain, slug: subDomain, deployMode: website.deployMode }),
+          };
         } catch (fsErr) {
           result = { success: false, error: fsErr.message };
         }

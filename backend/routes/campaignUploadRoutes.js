@@ -10,6 +10,7 @@ const Domain = require('../models/Domain');
 const { ensureUploadDir, CSV_UPLOAD_DIR } = require('../utils/ensureUploadDir');
 const { csvProcessorQueue } = require('../workers/csvProcessorWorker');
 const { randomUUID } = require('crypto');
+const { normaliseDeployMode, validateDomain, DEPLOY_MODES } = require('../utils/sitePath');
 
 
 // Configure multer for CSV file uploads
@@ -52,6 +53,7 @@ router.post('/start', auth, upload.single('csvFile'), [
     body('templateId').if(body('campaignType').equals('ai')).isMongoId().withMessage('Invalid Template ID format'),
     body('staticTemplateId').if(body('campaignType').equals('static')).notEmpty().withMessage('staticTemplateId is required for static campaigns'),
     body('credentialId').optional().isMongoId().withMessage('Invalid credentialId format'),
+    body('deployMode').optional().isIn(DEPLOY_MODES).withMessage(`deployMode must be one of: ${DEPLOY_MODES.join(', ')}`),
     validate
 ], async (req, res) => {
     try {
@@ -67,6 +69,7 @@ router.post('/start', auth, upload.single('csvFile'), [
             domainName,
             useDynamicDomain,
             model,
+            deployMode,
         } = req.body;
 
         // Validate required fields
@@ -145,6 +148,20 @@ router.post('/start', auth, upload.single('csvFile'), [
                 fs.unlinkSync(req.file.path);
                 return res.status(400).json({ msg: 'domainName is required for single domain mode' });
             }
+
+            // Validate domain name format
+            const domainCheck = validateDomain(domainName);
+            if (!domainCheck.ok) {
+                fs.unlinkSync(req.file.path);
+                return res.status(400).json({ msg: domainCheck.reason });
+            }
+
+            // Verify the domain is registered and owned by the requesting user
+            const domainRecord = await Domain.exists({ userId: req.user.id, domain: domainCheck.domain });
+            if (!domainRecord) {
+                fs.unlinkSync(req.file.path);
+                return res.status(403).json({ msg: `Domain "${domainCheck.domain}" is not registered in your account` });
+            }
         }
 
         // Create campaign record
@@ -162,6 +179,8 @@ router.post('/start', auth, upload.single('csvFile'), [
             rootFolder,
             model: model || process.env.OPENROUTER_MODEL,
             useDynamicDomain: isDynamicDomain,
+            // Only store deployMode for custom_domain; it is meaningless for cloud platforms.
+            deployMode: platform === 'custom_domain' ? normaliseDeployMode(deployMode) : 'subdomain',
             csvFilePath: req.file.path,
             totalJobs: 0,
             completedJobs: 0,

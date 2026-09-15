@@ -31,6 +31,11 @@ const AVAILABLE_MODELS = [
   },
 ];
 
+const DEPLOY_MODES = [
+  { id: 'subdomain',    name: 'Subdomain',    description: 'Each row becomes its own subdomain.' },
+  { id: 'subdirectory', name: 'Subdirectory', description: 'Each row becomes a folder on the domain.' },
+];
+
 import { PlusCircle, Globe, KeyRound, FileText, Users, Globe2, FileCode, Wand2, Layout, ArrowLeft } from 'lucide-react';
 
 const CreateCampaign = () => {
@@ -63,12 +68,25 @@ const CreateCampaign = () => {
   const [rootFolder, setRootFolder] = useState('');
   const [isCreatingNewFolder, setIsCreatingNewFolder] = useState(false);
   const [useDynamicDomain, setUseDynamicDomain] = useState(false);
+  const [deployMode, setDeployMode] = useState('subdomain');
 
   // S3 Listing state
   const [buckets, setBuckets] = useState([]);
   const [loadingBuckets, setLoadingBuckets] = useState(false);
   const [folders, setFolders] = useState([]);
   const [loadingFolders, setLoadingFolders] = useState(false);
+
+  // Live URL preview for the deployment structure selector
+  const deployModePreview = useMemo(() => {
+    const selectedDomain = domains.find(d => d._id === domainId);
+    const host = useDynamicDomain
+      ? '{domain from CSV}'
+      : (selectedDomain?.domain || 'yourdomain.com');
+    const slug = '{sub_domain}';
+    return deployMode === 'subdirectory'
+      ? `http://${host}/${slug}/`
+      : `http://${slug}.${host}`;
+  }, [deployMode, domains, domainId, useDynamicDomain]);
 
   // Submission state
   const [submitting, setSubmitting] = useState(false);
@@ -282,6 +300,9 @@ const CreateCampaign = () => {
       formData.append('campaignName', campaignName);
       formData.append('campaignType', mode);
       formData.append('platform', platform);
+      if (platform === 'custom_domain') {
+        formData.append('deployMode', deployMode);
+      }
       formData.append('model', mode === 'static' ? 'google/gemini-2.0-flash-001' : selectedModel);
 
       if (mode === 'static') {
@@ -595,6 +616,40 @@ const CreateCampaign = () => {
 
               {platform === 'custom_domain' ? (
                 <div className="md:col-span-2 space-y-4">
+
+                  {/* ── Deployment Structure selector ── */}
+                  <div>
+                    <label className="block text-white/80 mb-2">Deployment Structure</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      {DEPLOY_MODES.map((m) => {
+                        const isActive = deployMode === m.id;
+                        return (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => setDeployMode(m.id)}
+                            className={`text-left rounded-xl border p-4 transition-all ${
+                              isActive
+                                ? 'border-purple-500 bg-purple-500/20 ring-2 ring-purple-500'
+                                : 'border-white/10 bg-white/5 hover:bg-white/10'
+                            }`}
+                          >
+                            <div className="font-semibold text-white mb-1">{m.name}</div>
+                            <div className="text-xs text-white/60">{m.description}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {/* Live preview */}
+                    <div className="mt-3 bg-white/5 border border-white/10 rounded-lg px-4 py-3">
+                      <span className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Preview</span>
+                      <div className="mt-1">
+                        <code className="text-sm text-purple-300 break-all">{deployModePreview}</code>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ── Dynamic domain checkbox ── */}
                   <div className="flex items-center gap-3 bg-white/5 p-3 rounded-lg">
                     <input
                       type="checkbox"

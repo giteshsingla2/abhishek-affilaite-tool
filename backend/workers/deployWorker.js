@@ -15,8 +15,8 @@ const StaticWebsite = require('../models/StaticWebsite');
 const { uploadToS3 } = require('../services/uploaders/s3Adapter');
 const { uploadToNetlify } = require('../services/uploaders/netlifyAdapter');
 const { injectIntoTemplate } = require('../utils/templateInjector');
+const { buildIndexPath, buildSiteUrl, injectBaseHref } = require('../utils/sitePath');
 
-const USER_SITES_BASE_DIR = process.env.USER_SITES_BASE_DIR || '/var/www/user_sites';
 
 // CONCURRENCY TUNING GUIDE:
 // - Netlify platform campaigns: keep at 5 max (Netlify rate limits)
@@ -280,7 +280,7 @@ const generateHtml = async (systemPrompt, row, model) => {
 
 const worker = new Worker('deploy-queue', async (job) => {
   console.log(`[JOB_START] Job ${job.id} received with data:`, job.data);
-  const { platform, credentialId, templateId, row, campaignId, domainName: dynamicDomain, model } = job.data;
+  const { platform, credentialId, templateId, row, campaignId, domainName: dynamicDomain, model, deployMode: jobDeployMode } = job.data;
   const subDomain = row?.sub_domain;
 
   const campaign = await Campaign.findById(campaignId);
@@ -290,6 +290,10 @@ const worker = new Worker('deploy-queue', async (job) => {
 
   const targetDomain = dynamicDomain || campaign.domainName;
 
+  // Fallback chain: job payload (new jobs) -> campaign record -> safe default.
+  // This keeps jobs already sitting in Redis before this deploy working correctly.
+  const deployMode = jobDeployMode || campaign.deployMode || 'subdomain';
+
   const website = await Website.create({
     userId: campaign.userId,
     campaignId,
@@ -297,6 +301,7 @@ const worker = new Worker('deploy-queue', async (job) => {
     subdomain: subDomain,
     domain: targetDomain,
     platform: platform,
+    deployMode,
     status: 'Pending',
   });
 
@@ -340,13 +345,14 @@ const worker = new Worker('deploy-queue', async (job) => {
         result = await uploadToNetlify(htmlContent, subDomain, credential);
         break;
       case 'custom_domain':
-        const sitePath = path.join(USER_SITES_BASE_DIR, targetDomain, subDomain);
         try {
-          fs.mkdirSync(sitePath, { recursive: true });
-          fs.writeFileSync(path.join(sitePath, 'index.html'), htmlContent);
+          const htmlToWrite = injectBaseHref(htmlContent, { slug: subDomain, deployMode });
+          const indexPath = buildIndexPath({ domain: targetDomain, slug: subDomain, deployMode });
+          fs.mkdirSync(path.dirname(indexPath), { recursive: true });
+          fs.writeFileSync(indexPath, htmlToWrite);
           result = {
             success: true,
-            url: `http://${subDomain}.${targetDomain}`,
+            url: buildSiteUrl({ domain: targetDomain, slug: subDomain, deployMode }),
           };
         } catch (fsErr) {
           console.error(`[ERROR] File System Error in custom_domain deploy:`, fsErr);
@@ -487,7 +493,8 @@ const staticDeployQueue = new Queue('static-deploy-queue', { connection });
 const staticWorker = new Worker('static-deploy-queue', async (job) => {
   const { 
     staticTemplateId, row, campaignId, 
-    platform, credentialId, domainName: dynamicDomain, model 
+    platform, credentialId, domainName: dynamicDomain, model,
+    deployMode: jobDeployMode,
   } = job.data;
 
   const subDomain = row?.sub_domain;
@@ -496,6 +503,9 @@ const staticWorker = new Worker('static-deploy-queue', async (job) => {
   if (!campaign) throw new Error(`Campaign ${campaignId} not found`);
 
   const targetDomain = dynamicDomain || campaign.domainName;
+
+  // Fallback chain: job payload (new jobs) -> campaign record -> safe default.
+  const deployMode = jobDeployMode || campaign.deployMode || 'subdomain';
 
   // Create initial record
   const staticWebsite = await StaticWebsite.create({
@@ -506,6 +516,7 @@ const staticWorker = new Worker('static-deploy-queue', async (job) => {
     subdomain: subDomain,
     domain: targetDomain,
     platform,
+    deployMode,
     status: 'Pending'
   });
 
@@ -547,11 +558,15 @@ const staticWorker = new Worker('static-deploy-queue', async (job) => {
         result = await uploadToNetlify(htmlToUpload, subDomain, credential);
         break;
       case 'custom_domain':
-        const sitePath = path.join(USER_SITES_BASE_DIR, targetDomain, subDomain);
         try {
-          fs.mkdirSync(sitePath, { recursive: true });
-          fs.writeFileSync(path.join(sitePath, 'index.html'), htmlToUpload);
-          result = { success: true, url: `http://${subDomain}.${targetDomain}` };
+          const htmlToWrite = injectBaseHref(htmlToUpload, { slug: subDomain, deployMode });
+          const indexPath = buildIndexPath({ domain: targetDomain, slug: subDomain, deployMode });
+          fs.mkdirSync(path.dirname(indexPath), { recursive: true });
+          fs.writeFileSync(indexPath, htmlToWrite);
+          result = {
+            success: true,
+            url: buildSiteUrl({ domain: targetDomain, slug: subDomain, deployMode }),
+          };
         } catch (fsErr) {
           result = { success: false, error: fsErr.message };
         }

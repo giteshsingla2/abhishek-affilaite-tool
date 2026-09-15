@@ -48,6 +48,11 @@ const WebsiteSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  deployMode: {
+    type: String,
+    enum: ['subdomain', 'subdirectory'],
+    default: 'subdomain',
+  },
   createdAt: {
     type: Date,
     default: Date.now,
